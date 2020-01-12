@@ -1,0 +1,5 @@
+.ipynb_checkpoints
+airflow/logs
+airflow/airflow-webserver.pid
+airflow/airflow.db
+airflow/*.cfg

@@ -1,0 +1,11 @@
+[Quandl]
+API_KEY=
+
+[AWS]
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+REGION_NAME=us-east-1
+CLUSTER_NAME=ShortInterestEffectDL
+OUTPUT_DATA=s3a://short-interest-effect/data/
+VPC_ID=
+SUBNET_ID=
