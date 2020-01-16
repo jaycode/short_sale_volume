@@ -1,3 +1,22 @@
+[App]
+# Quandl short interest data earliest date is 2013-04-01
+START_DATE=2013-04-01
+# Number of stocks to pull. Set to empty for all stocks.
+STOCK_LIMITS=1
+# Pull only the following stocks. Overrides STOCK_LIMITS. All stocks if empty.
+STOCKS=['FB', 'GOOG', 'AMZN', 'TRMT', 'TSLA', 'MCD', 'NFLX']
+
+# Works with local path or s3a dns
+DB_HOST=
+
+# Begin with `/`
+TABLE_STOCK_INFO_NASDAQ=/data/raw/stock_info_nasdaq
+TABLE_STOCK_INFO_NYSE=/data/raw/stock_info_nyse
+TABLE_SHORT_INTERESTS_NASDAQ=/test_data/raw/short_interests_nasdaq
+TABLE_SHORT_INTERESTS_NYSE=/data/raw/short_interests_nyse
+TABLE_STOCK_PRICES=/data/raw/prices
+TABLE_SHORT_ANALYSIS=/data/processed/short_analysis
+
 [Quandl]
 API_KEY=
 

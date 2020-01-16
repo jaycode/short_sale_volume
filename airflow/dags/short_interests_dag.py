@@ -37,23 +37,23 @@ default_args = {
     'catchup':True
 }
 
-dag = DAG('prices_dag',
+dag = DAG('short_interests_dag',
           default_args=default_args,
-          description="Pull stock pricing data from Quotemedia",
+          description="Pull short interest data from Quandl",
           schedule_interval='@daily',
           max_active_runs=1
-        )
+)
 
 ec2, emr, iam = emrs.get_boto_clients(config['AWS']['REGION_NAME'], config=config)
 
 def submit_spark_job_from_file(**kwargs):
     if emrs.is_cluster_terminated(emr, Variable.get('cluster_id', None)):
-        Variable.set('prices_dag_state', 'FAILED')
+        Variable.set('short_interests_dag_state', 'FAILED')
         raise AirflowException("Cluster has been terminated. Redo all DAGs.")
 
-    if Variable.get('short_interests_dag_state', None) == 'FAILED':
-        Variable.set('prices_dag_state', 'FAILED')
-        raise AirflowException("Error in short_interests_dag. Redo all DAGs.")
+    if Variable.get('prices_dag_state', None) == 'FAILED':
+        Variable.set('short_interests_dag_state', 'FAILED')
+        raise AirflowException("Error in prices_dag. Redo all DAGs.")
 
     cluster_dns = emrs.get_cluster_dns(emr, Variable.get('cluster_id'))
     emrs.kill_all_inactive_spark_sessions(cluster_dns)
@@ -83,15 +83,11 @@ def submit_spark_job_from_file(**kwargs):
         kwargs['on_complete']()
 
 
-def pull_pricing_data(**kwargs):
-    Variable.set('prices_dag_state', 'COMPLETED')
-
-
 # This is so that we don't end up re-running this DAG before everything else completes.
 wait_for_fresh_run_task = VariableExistenceSensor(
     task_id='Wait_for_fresh_run',
     poke_interval=120,
-    varnames=['prices_dag_state'],
+    varnames=['short_interests_dag_state'],
     reverse=True,
     mode='reschedule',
     dag=dag
@@ -126,13 +122,13 @@ pull_stock_symbols_task = PythonOperator(
     dag=dag
 )
 
-pull_pricing_data_task = PythonOperator(
-    task_id='Pull_pricing_data',
+pull_short_interest_data_task = PythonOperator(
+    task_id='Pull_short_interest_data',
     python_callable=submit_spark_job_from_file,
     op_kwargs={
         'commonpath': 'airflow/dags/etl/common.py',
         'helperspath': 'airflow/dags/etl/helpers.py',
-        'filepath': 'airflow/dags/etl/pull_prices.py', 
+        'filepath': 'airflow/dags/etl/pull_short_interests.py', 
         'args': {
             'START_DATE': config['App']['START_DATE'],
             'QUANDL_API_KEY': config['Quandl']['API_KEY'],
@@ -144,8 +140,8 @@ pull_pricing_data_task = PythonOperator(
             'DB_HOST': config['App']['DB_HOST'],
             'TABLE_STOCK_INFO_NASDAQ': config['App']['TABLE_STOCK_INFO_NASDAQ'],
             'TABLE_STOCK_INFO_NYSE': config['App']['TABLE_STOCK_INFO_NYSE'],
-            'TABLE_STOCK_PRICES': config['App']['TABLE_STOCK_PRICES'],
-            'URL': "http://app.quotemedia.com/quotetools/getHistoryDownload.csv?&webmasterId=501&startDay={sd}&startMonth={sm}&startYear={sy}&endDay={ed}&endMonth={em}&endYear={ey}&isRanged=true&symbol={sym}",
+            'TABLE_SHORT_INTERESTS_NASDAQ': config['App']['TABLE_SHORT_INTERESTS_NASDAQ'],
+            'TABLE_SHORT_INTERESTS_NYSE': config['App']['TABLE_SHORT_INTERESTS_NYSE'],
         }
     },
     dag=dag
@@ -157,7 +153,7 @@ quality_check_task = PythonOperator(
     op_kwargs={
         'commonpath': 'airflow/dags/etl/common.py',
         'helperspath': 'airflow/dags/etl/helpers.py',
-        'filepath': 'airflow/dags/etl/pull_prices_quality.py', 
+        'filepath': 'airflow/dags/etl/pull_short_interests_quality.py', 
         'args': {
             'AWS_ACCESS_KEY_ID': config['AWS']['AWS_ACCESS_KEY_ID'],
             'AWS_SECRET_ACCESS_KEY': config['AWS']['AWS_SECRET_ACCESS_KEY'],
@@ -166,12 +162,14 @@ quality_check_task = PythonOperator(
             'DB_HOST': config['App']['DB_HOST'],
             'TABLE_STOCK_INFO_NASDAQ': config['App']['TABLE_STOCK_INFO_NASDAQ'],
             'TABLE_STOCK_INFO_NYSE': config['App']['TABLE_STOCK_INFO_NYSE'],
-            'TABLE_STOCK_PRICES': config['App']['TABLE_STOCK_PRICES'],
+            'TABLE_SHORT_INTERESTS_NASDAQ': config['App']['TABLE_SHORT_INTERESTS_NASDAQ'],
+            'TABLE_SHORT_INTERESTS_NYSE': config['App']['TABLE_SHORT_INTERESTS_NYSE'],
         },
-        'on_complete': lambda *args: Variable.set('prices_dag_state', 'COMPLETED')
+        'on_complete': lambda *args: Variable.set('short_interests_dag_state', 'COMPLETED')
     },
     dag=dag
 )
 
+
 wait_for_fresh_run_task >> wait_for_cluster_task >> \
-pull_stock_symbols_task >> pull_pricing_data_task >> quality_check_task
+pull_stock_symbols_task >> pull_short_interest_data_task >> quality_check_task
