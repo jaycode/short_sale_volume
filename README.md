@@ -31,6 +31,9 @@ The pipeline is to be run once a day at 00:00. On the first run, it gets all dat
 
 ## How to setup and run
 
+1. Create a key pair in AWS EC2 console
+2. [Launch Stack](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=Airflow-Blog&templateURL=https://s3.amazonaws.com/aws-bigdata-blog/artifacts/airflow.livy.emr/airflow.yaml)
+
 1. Update `airflow.cfg` as follows: 
     - load_examples: False
     - executor: use `LocalExecutor`
