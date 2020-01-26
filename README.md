@@ -62,6 +62,13 @@ The pipeline is to be run once a day at 00:00. On the first run, it gets all dat
 
     Before running the scheduler.
 
+
+To kill Airflow scheduler:
+
+```
+$ kill $(ps -ef | grep "airflow scheduler" | awk '{print $2}')
+```
+
 ## Other Scenarios
 
 ### 1. What if the data was increased by 100x?
