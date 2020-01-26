@@ -31,19 +31,15 @@ The pipeline is to be run once a day at 00:00. On the first run, it gets all dat
 
 ## How to setup and run
 
-1. Create a key pair in AWS EC2 console
-2. [Launch Stack](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=Airflow-Blog&templateURL=https://s3.amazonaws.com/aws-bigdata-blog/artifacts/airflow.livy.emr/airflow.yaml)
-
-1. Update `airflow.cfg` as follows: 
-    - load_examples: False
-    - executor: use `LocalExecutor`
-    - sql_alchemy_conn: use either MySQL or PostgreSQL's connection link.
-2. Copy and rename `config.cfg.default` into `config.cfg` and fill in the following information:
-    - `DB_HOST`: Supports either local path or `s3a` bucket link e.g. `s3a://bucket-name`.
-    - `Quandl API_KEY`: Get API key from [Quandl](https://quandl.com) and paste it here.
-    - `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`: Get them from AWS, in IAM admin.
-3. Run `airflow-start.sh` to turn on the Airflow server and schedulers.
-
+1. Create a key pair in AWS EC2 console.
+2. Create a CloudFormation stack from `basic_network.yml` template. This is a generic VPC configuration with 2 private and 2 public subnets which should be quite useful for other similar projects too. I recommend setting the stack name with something generic, like "BasicNetwork".
+3. Create a CloudFormation stack from `aws-cf_template.yml`. Pass in your Quandl key and AWS Access ID and Private Access Key. I would name this stack with a specific project's name like "ShortInterests".
+4. After the stack created, go to the "Outputs" tab to get the URL of the Airflow admin, something like `http://ec2-3-219-234-248.compute-1.amazonaws.com:8080`. You can get the endpoint from there, which you can use to SSH connect.
+```
+chmod 400 ~/path/to/airflow_pem.pem
+ssh -i "~/path/to/airflow_pem.pem" ec2-user@ec2-3-219-234-248.compute-1.amazonaws.com
+``` 
+5. Note that the Airflow admin may likely not to be ready just yet, because there may be some code that are still running on the EC2 server. To check on the progress, SSH connect to the EC2 instance, then run this command `cat /var/log/user-data.log` to see the entire log, or `tail /var/log/user-data.log` to view the last few lines.
 
 ## Other Scenarios
 

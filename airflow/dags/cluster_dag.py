@@ -13,6 +13,7 @@ from airflow.models import Variable
 import lib.emrspark_lib as emrs
 import configparser
 import time
+from airflow.configuration import conf as airflow_config
 
 import logging
 import os
@@ -21,7 +22,8 @@ from airflow.utils import timezone
 yesterday = timezone.utcnow() - timedelta(days=2)
 
 config = configparser.ConfigParser()
-config.read('airflow/config.cfg')
+airflow_dir = os.path.split(airflow_config['core']['dags_folder'])[0]
+config.read('{}/config.cfg'.format(airflow_dir))
 
 CLUSTER_NAME = config['AWS']['CLUSTER_NAME']
 VPC_ID = config['AWS']['VPC_ID']
