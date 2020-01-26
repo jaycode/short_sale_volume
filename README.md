@@ -71,13 +71,13 @@ $ kill $(ps -ef | grep "airflow scheduler" | awk '{print $2}')
 
 ## Other Scenarios
 
-### 1. What if the data was increased by 100x?
+### 1. What if the data were increased by 100x?
 The main problem is with pulling the data from the APIs. Each request takes about 3 seconds. To make this process faster, we can try adding more nodes in our EM3 cluster to deal with this situation.
 
-### 2. What if we need to run the pipeline on a daily basis by 7 am every day?
+### 2. What if we needed to run the pipeline on a daily basis by 7 am every day?
 Just need to update `schedule_interval` setting accordingly for all of the DAGs for this.
 
-### 3. What to do if the database needs to be accessed by 100+ people?
+### 3. What to do if the database needed to be accessed by 100+ people?
 The answer to this comes in two flavors:
 - If the users need to flexibly access the database to perform any SQL queries, we opt for Redshift cluster with auto-scaling capabilites.
 - If the users would run basically a few sets of queries, use the combination of Apache Spark and Apache Cassandra to use the latter as a storage layer. [Here](https://opencredo.com/blogs/data-analytics-using-cassandra-and-spark/) is a link to a tutorial on this.
