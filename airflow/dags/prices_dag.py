@@ -7,6 +7,7 @@ from airflow.operators.custom_operators import VariableExistenceSensor
 from airflow.models import Variable
 from airflow import AirflowException
 import lib.emrspark_lib as emrs
+from airflow.configuration import conf as airflow_config
 
 import logging
 import configparser
@@ -16,7 +17,8 @@ from airflow.utils import timezone
 yesterday = timezone.utcnow() - timedelta(days=2)
 
 config = configparser.ConfigParser()
-config.read('airflow/config.cfg')
+airflow_dir = os.path.split(airflow_config['core']['dags_folder'])[0]
+config.read('{}/config.cfg'.format(airflow_dir))
 
 if config['App']['STOCKS'] == '':
     STOCKS = []
