@@ -21,12 +21,12 @@ Parameters:
   AWSAccessKeyID:
     Description: AWS Access Key ID that can access S3 bucket set in "OutputDBHost"
     Type: String
-    Default: AKIAZ7YWVG74XA5O2O66
+    Default: AKIAZ7YWVG74R2JETMVE
   AWSSecretAccessKey:
     Description: AWS Secret Access Key that can access S3 bucket set in "OutputDBHost"
     NoEcho: 'true'
     Type: String
-    Default: OYmbKk2v2XHN5wjEx3IYHBgXsnY3bByxCsgsqZsF
+    Default: 99sUi8+AyBJnLiPOxIFy+aR8KDd/Dlk7n+opLlZM
   AirflowDBPassword:
     Default: airflowpassword
     NoEcho: 'true'
@@ -149,15 +149,22 @@ Resources:
          # Hide examples
          sed -i '/load_examples = True/s/^/#/g' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
          sed -i '/load_examples = True/ a load_examples = False' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         # Setup webserver log
+         mkdir -p /home/ec2-user/log
+         touch /home/ec2-user/log/access.log
+         chmod 777 /home/ec2-user/log
+         chmod 777 /home/ec2-user/log/access.log
+         sed -i -e '/access_logfile/ s/=.*/=\/home\/ec2-user\/log\/access\.log/' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         #
          airflow initdb
          # Update configuration files
          cp /home/ec2-user/short_interest_effect/airflow/config.cfg.default /home/ec2-user/short_interest_effect/airflow/config.cfg
          # Use | as delimiter instead of / because OutputDBHost may have forward slashes
          sed -i -e '/DB_HOST=/ s|=.*|=${OutputDBHost}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/API_KEY=/ s/=.*/=${QuandlAPIKey}/' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/AWS_ACCESS_KEY_ID=/ s/=.*/=${AWSAccessKeyID}/' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/AWS_SECRET_ACCESS_KEY=/ s/=.*/=${AWSSecretAccessKey}/' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/REGION_NAME=/ s/=.*/=${AWS::Region}/' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/API_KEY=/ s|=.*|=${QuandlAPIKey}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/AWS_ACCESS_KEY_ID=/ s|=.*|=${AWSAccessKeyID}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/AWS_SECRET_ACCESS_KEY=/ s|=.*|=${AWSSecretAccessKey}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/REGION_NAME=/ s|=.*|=${AWS::Region}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
          # Run Airflow webserver
          airflow webserver
     Metadata:
