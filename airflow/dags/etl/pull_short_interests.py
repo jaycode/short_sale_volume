@@ -1,3 +1,17 @@
+from datetime import datetime
+
+def a_before_b(a, b):
+    date_format = "%Y-%m-%d"
+
+    # create datetime objects from the strings
+    da = datetime.strptime(a, date_format)
+    db = datetime.strptime(b, date_format)
+
+    if da < db:
+        return True
+    else:
+        return False
+    
 def convert_data(olddata, symbol, url):
     col_names = olddata['dataset']['column_names']
     col_names.append('Symbol')
@@ -12,22 +26,14 @@ def convert_data(olddata, symbol, url):
     return newdata
 
 
-def pull_short_interests(exchange, host, info_table_path, short_interests_table_path):
-
-    create_table = not(spark_table_exists(host, short_interests_table_path))
+def pull_short_interests(exchange, host, info_table_path, short_interests_table_path, log_every_n=100):
         
-    def pull_exchange_short_interests_by_symbol(symbol):
+    def pull_exchange_short_interests_by_symbol(symbol, start_date, end_date):
         """
         Return:
             list of dicts [{'colname': value, ...}, ...]
         """
-        if create_table == True:
-            # If table does not exist, pull all data.
-            url = 'https://www.quandl.com/api/v3/datasets/FINRA/'+exchange+'_{}?start_date='+START_DATE+'&end_date='+YESTERDAY_DATE+'&api_key='+QUANDL_API_KEY
-        else:
-            # If table had existed, pull yesterday's data.
-            url = 'https://www.quandl.com/api/v3/datasets/FINRA/'+exchange+'_{}?start_date='+YESTERDAY_DATE+'&end_date='+YESTERDAY_DATE+'&api_key='+QUANDL_API_KEY
-
+        url = 'https://www.quandl.com/api/v3/datasets/FINRA/'+exchange+'_{}?start_date='+start_date+'&end_date='+end_date+'&api_key='+QUANDL_API_KEY
         url = url.format(symbol)
         response = requests.get(url)
         newdata = []
@@ -35,60 +41,43 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
             newdata = convert_data(response.json(), symbol, url)
         return newdata
 
-    
-    # [{'colname': value, ...}, ...]
-    schema = T.ArrayType(
-                T.MapType(
-                    T.StringType(), T.StringType()
-                )
-             )
-    udf_pull_exchange_short_interests = F.udf(pull_exchange_short_interests_by_symbol, schema)
-
     # Prepare list of stocks
     if STOCKS is not None and len(STOCKS) > 0:
         rdd1 = spark.sparkContext.parallelize(STOCKS)
         row_rdd = rdd1.map(lambda x: Row(x))
         df = spark.createDataFrame(row_rdd,['Symbol'])
     else:
-        df = spark.read.parquet(host+info_table_path)
+        df = spark.read.csv(host+info_table_path, header=True)
         if LIMIT is not None:
             df = df.limit(LIMIT)
-
-    df = df.withColumn('short_interests', udf_pull_exchange_short_interests('Symbol'))
-
-    # Convert [short_interests: [{col: val, ...}, ...]] to
-    # [{col: val, ...}, ...]
-    df = df.select(F.explode(df['short_interests']).alias('col')) \
-         .rdd.map(lambda x: x['col'])
-
-    df_schema = T.StructType([T.StructField('Date', T.StringType(), False),
-                              T.StructField('ShortExemptVolume', T.StringType(), True),
-                              T.StructField('ShortVolume', T.StringType(), True),
-                              T.StructField('Symbol', T.StringType(), False),
-                              T.StructField('TotalVolume', T.StringType(), True),
-                              T.StructField('SourceURL', T.StringType(), True),
-                             ])
-    df = spark.createDataFrame(df, df_schema)
-    df = df.withColumn('Date', df['Date'].cast(T.DateType())) \
-         .withColumn('ShortExemptVolume', df['ShortExemptVolume'].cast(T.DoubleType())) \
-         .withColumn('ShortVolume', df['ShortVolume'].cast(T.DoubleType())) \
-         .withColumn('TotalVolume', df['TotalVolume'].cast(T.DoubleType()))
-
-    if create_table:
-        logger.warn("Creating table {}".format(host+short_interests_table_path))
-        df.write.mode('overwrite').parquet(host+short_interests_table_path)
-    else:
-        logger.warn("Appending to table {}".format(host+short_interests_table_path))
-        df.write.mode('append').parquet(host+short_interests_table_path)
+    symbols = df.select('Symbol').rdd.map(lambda r: r['Symbol']).collect()
+    
+    table_exists = spark_table_exists(host, short_interests_table_path)
+    if table_exists:
+        short_sdf = spark.read.csv(host+short_interests_table_path, header=True)
         
-        # Drop duplicates later when we combine the datasets:
-        # 1. We do not want to waste S3 bandwidth.
-        # 2. Raw data are meant to be dirty. We are going to use only the final dataset for analysis.
-        # 3. If we really want to clean the datasets. Create another DAG for that.
-        # code:
-#         spark.read.parquet(host+short_interests_table_path).dropDuplicates(['Date']) \
-#         .write.mode('append').parquet(host+short_interests_table_path)
+    total_rows = 0
+    for i, symbol in enumerate(symbols):
+        if table_exists:
+            # Get the last date of a stock. If this last date >= YESTERDAY_DATE, don't do anything.
+            dates = short_sdf.select('Date').where((short_sdf.Symbol == F.lit(symbol))).orderBy(F.desc('Date')).limit(1) \
+                .rdd.map(lambda r: r['Date']).collect()
+            if len(dates) > 0:
+                if a_before_b(dates[0], YESTERDAY_DATE):
+                    data = pull_exchange_short_interests_by_symbol(symbol, dates[0], YESTERDAY_DATE)
+                else:
+                    data = []
+            else:
+                data = pull_exchange_short_interests_by_symbol(symbol, START_DATE, YESTERDAY_DATE)
+        else:
+            data = pull_exchange_short_interests_by_symbol(symbol, START_DATE, YESTERDAY_DATE)
+        total_rows += len(data)
+        if (i%log_every_n == 0):
+            logger.warn("{}/{} - total rows in this batch: {}".format(i+1, len(symbols), total_rows))
         
+        if len(data) > 0:
+            short_sdf = spark.createDataFrame(data)
+            short_sdf.write.mode('append').format('csv').save(host+short_interests_table_path, header=True)
     logger.warn("done!")
 
 pull_short_interests('FNSQ', DB_HOST, TABLE_STOCK_INFO_NASDAQ, TABLE_SHORT_INTERESTS_NASDAQ)

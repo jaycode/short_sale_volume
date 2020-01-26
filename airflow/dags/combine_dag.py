@@ -8,6 +8,7 @@ from airflow.models import Variable
 from airflow import AirflowException
 import lib.emrspark_lib as emrs
 from airflow.configuration import conf as airflow_config
+import boto3
 
 import logging
 import configparser
@@ -75,6 +76,18 @@ def submit_spark_job_from_file(**kwargs):
             raise AirflowException("ETL process fails.")
 
     if final_status in ['available', 'ok'] and 'on_complete' in kwargs:
+        # Update CSV file's ACL to public-read
+        if 's3a://' in config['App']['DB_HOST'] or 's3://' in config['App']['DB_HOST']:
+            bucket = config['App']['DB_HOST'].split('/')[-1]
+            key = config['App']['TABLE_SHORT_ANALYSIS'][1:]+'.csv'
+            (boto3
+             .session
+             .Session(region_name='us-east-1')
+             .resource('s3')
+             .Object(bucket, key)
+             .Acl()
+             .put(ACL='public-read'))
+
         kwargs['on_complete']()
 
 
@@ -108,9 +121,9 @@ combine_datasets_task = PythonOperator(
     task_id='Combine_datasets',
     python_callable=submit_spark_job_from_file,
     op_kwargs={
-        'commonpath': 'airflow/dags/etl/common.py',
-        'helperspath': 'airflow/dags/etl/helpers.py',
-        'filepath': 'airflow/dags/etl/combine.py', 
+        'commonpath': '{}/dags/etl/common.py'.format(airflow_dir),
+        'helperspath': '{}/dags/etl/helpers.py'.format(airflow_dir),
+        'filepath': '{}/dags/etl/combine.py'.format(airflow_dir), 
         'args': {
             'YESTERDAY_DATE': '{{yesterday_ds}}',
             'AWS_ACCESS_KEY_ID': config['AWS']['AWS_ACCESS_KEY_ID'],
@@ -129,9 +142,9 @@ quality_check_task = PythonOperator(
     task_id='Quality_check',
     python_callable=submit_spark_job_from_file,
     op_kwargs={
-        'commonpath': 'airflow/dags/etl/common.py',
-        'helperspath': 'airflow/dags/etl/helpers.py',
-        'filepath': 'airflow/dags/etl/combine_quality.py', 
+        'commonpath': '{}/dags/etl/common.py'.format(airflow_dir),
+        'helperspath': '{}/dags/etl/helpers.py'.format(airflow_dir),
+        'filepath': '{}/dags/etl/combine_quality.py'.format(airflow_dir), 
         'args': {
             'AWS_ACCESS_KEY_ID': config['AWS']['AWS_ACCESS_KEY_ID'],
             'AWS_SECRET_ACCESS_KEY': config['AWS']['AWS_SECRET_ACCESS_KEY'],

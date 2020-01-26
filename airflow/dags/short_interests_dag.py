@@ -107,9 +107,9 @@ pull_stock_symbols_task = PythonOperator(
     task_id='Pull_stock_symbols',
     python_callable=submit_spark_job_from_file,
     op_kwargs={
-        'commonpath': 'airflow/dags/etl/common.py',
-        'helperspath': 'airflow/dags/etl/helpers.py',
-        'filepath': 'airflow/dags/etl/pull_stock_info.py', 
+        'commonpath': '{}/dags/etl/common.py'.format(airflow_dir),
+        'helperspath': '{}/dags/etl/helpers.py'.format(airflow_dir),
+        'filepath': '{}/dags/etl/pull_stock_info.py'.format(airflow_dir), 
         'args': {
             'AWS_ACCESS_KEY_ID': config['AWS']['AWS_ACCESS_KEY_ID'],
             'AWS_SECRET_ACCESS_KEY': config['AWS']['AWS_SECRET_ACCESS_KEY'],
@@ -128,9 +128,9 @@ pull_short_interest_data_task = PythonOperator(
     task_id='Pull_short_interest_data',
     python_callable=submit_spark_job_from_file,
     op_kwargs={
-        'commonpath': 'airflow/dags/etl/common.py',
-        'helperspath': 'airflow/dags/etl/helpers.py',
-        'filepath': 'airflow/dags/etl/pull_short_interests.py', 
+        'commonpath': '{}/dags/etl/common.py'.format(airflow_dir),
+        'helperspath': '{}/dags/etl/helpers.py'.format(airflow_dir),
+        'filepath': '{}/dags/etl/pull_short_interests.py'.format(airflow_dir), 
         'args': {
             'START_DATE': config['App']['START_DATE'],
             'QUANDL_API_KEY': config['Quandl']['API_KEY'],
@@ -153,9 +153,9 @@ quality_check_task = PythonOperator(
     task_id='Quality_check',
     python_callable=submit_spark_job_from_file,
     op_kwargs={
-        'commonpath': 'airflow/dags/etl/common.py',
-        'helperspath': 'airflow/dags/etl/helpers.py',
-        'filepath': 'airflow/dags/etl/pull_short_interests_quality.py', 
+        'commonpath': '{}/dags/etl/common.py'.format(airflow_dir),
+        'helperspath': '{}/dags/etl/helpers.py'.format(airflow_dir),
+        'filepath': '{}/dags/etl/pull_short_interests_quality.py'.format(airflow_dir), 
         'args': {
             'AWS_ACCESS_KEY_ID': config['AWS']['AWS_ACCESS_KEY_ID'],
             'AWS_SECRET_ACCESS_KEY': config['AWS']['AWS_SECRET_ACCESS_KEY'],

@@ -11,7 +11,6 @@ Parameters:
     Description: REQUIRED - Can be a local path or S3 bucket path (With format "s3a://<bucket-name>" DO NOT END with "/"). This path will be used to read and write the short interest dataset.
     Type: String
     AllowedPattern: '.+'
-    Default: s3a://short-interest-effect
   QuandlAPIKey:
     Description: REQUIRED - Quandl API Key
     NoEcho: 'true'
@@ -39,6 +38,14 @@ Parameters:
   SubnetId:
     Type: AWS::EC2::Subnet::Id
     Description: Subnet of the EC2 server. Must belong in VPC from which you set VPCId from
+  InstanceType:
+    Type: String
+    Default: t3.small
+    Description: t2.micro is not enough to run both scheduler and webserver, but it is useful for debugging aws-cf_template.yml.
+    AllowedValues:
+      - t2.micro
+      - t3.small
+      - t3.medium
 # Mapping to find the Amazon Linux AMI in each region.
 Mappings:
   RegionMap:
@@ -58,7 +65,7 @@ Resources:
     Properties:
       KeyName: !Ref 'KeyName'
       SecurityGroupIds: [!GetAtt AirflowEC2SecurityGroup.GroupId]
-      InstanceType: 't2.micro'
+      InstanceType: !Ref 'InstanceType'
       SubnetId: !Ref 'SubnetId'
       IamInstanceProfile:
         Ref: EC2InstanceProfile
@@ -112,7 +119,7 @@ Resources:
          cd /home/ec2-user
          git clone -b aws-latest https://github.com/jaycode/short_interest_effect.git
          cd /home/ec2-user/short_interest_effect
-         sudo chmod 777 /home/ec2-user/short_interest_effect/*
+         sudo chmod -R 777 /home/ec2-user/short_interest_effect
          # Install boto3
          sudo python3 -m pip install boto3
          # Install airflow using pip
@@ -131,6 +138,15 @@ Resources:
          #
          echo 'export PATH=/usr/local/bin:$PATH' >> /home/ec2-user/.bash_profile
          echo 'export AIRFLOW_HOME=/home/ec2-user/short_interest_effect/airflow' >> /home/ec2-user/.bash_profile
+         #
+         # Update configuration files
+         cp /home/ec2-user/short_interest_effect/airflow/config.cfg.default /home/ec2-user/short_interest_effect/airflow/config.cfg
+         # Use | as delimiter instead of / because OutputDBHost may have forward slashes
+         sed -i -e '/DB_HOST=/ s|=.*|=${OutputDBHost}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/API_KEY=/ s|=.*|=${QuandlAPIKey}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/AWS_ACCESS_KEY_ID=/ s|=.*|=${AWSAccessKeyID}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/AWS_SECRET_ACCESS_KEY=/ s|=.*|=${AWSSecretAccessKey}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/REGION_NAME=/ s|=.*|=${AWS::Region}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
          #
          # Initialize Airflow
          airflow initdb
@@ -152,14 +168,6 @@ Resources:
          sed -i -e '/access_logfile/ s/=.*/=\/home\/ec2-user\/log\/access\.log/' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
          #
          airflow initdb
-         # Update configuration files
-         cp /home/ec2-user/short_interest_effect/airflow/config.cfg.default /home/ec2-user/short_interest_effect/airflow/config.cfg
-         # Use | as delimiter instead of / because OutputDBHost may have forward slashes
-         sed -i -e '/DB_HOST=/ s|=.*|=${OutputDBHost}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/API_KEY=/ s|=.*|=${QuandlAPIKey}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/AWS_ACCESS_KEY_ID=/ s|=.*|=${AWSAccessKeyID}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/AWS_SECRET_ACCESS_KEY=/ s|=.*|=${AWSSecretAccessKey}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/REGION_NAME=/ s|=.*|=${AWS::Region}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
          # Run Airflow webserver
          airflow webserver
     Metadata:
