@@ -17,10 +17,10 @@ Parameters:
     Type: String
     AllowedPattern: '.+'
   AWSAccessKeyID:
-    Description: AWS Access Key ID that can access S3 bucket set in "OutputDBHost"
+    Description: AWS Access Key ID that can access S3 bucket set in "OutputDBHost" and create EMR cluster.
     Type: String
   AWSSecretAccessKey:
-    Description: AWS Secret Access Key that can access S3 bucket set in "OutputDBHost"
+    Description: AWS Secret Access Key that can access S3 bucket set in "OutputDBHost" and create EMR cluster.
     NoEcho: 'true'
     Type: String
   AirflowDBPassword:
@@ -41,11 +41,19 @@ Parameters:
   InstanceType:
     Type: String
     Default: t3.small
-    Description: t2.micro is not enough to run both scheduler and webserver, but it is useful for debugging aws-cf_template.yml.
+    Description: t2.micro is not enough to run both scheduler and webserver, but it is useful for debugging aws-cf_template.yml
     AllowedValues:
       - t2.micro
       - t3.small
       - t3.medium
+  StockLimits:
+    Type: String
+    AllowedPattern: '[ 0-9]*'
+    Description: Number of stocks to pull. Set to empty for all stocks
+  Stocks:
+    Type: String
+    Default: '[]'
+    Description: Pull only the following stocks. Overrides StockLimits. All stocks if empty
 # Mapping to find the Amazon Linux AMI in each region.
 Mappings:
   RegionMap:
@@ -132,12 +140,12 @@ Resources:
          sudo python3 -m pip install --upgrade six
          sudo python3 -m pip install markupsafe
          sudo python3 -m pip install --upgrade MarkupSafe
-         echo 'export PATH=/usr/local/bin:$PATH' >> /root/.bash_profile
-         echo 'export AIRFLOW_HOME=/home/ec2-user/short_interest_effect/airflow' >> /root/.bash_profile
-         source /root/.bash_profile
+         echo 'export PATH=/usr/local/bin:$PATH' >> /root/.bashrc
+         echo 'export AIRFLOW_HOME=/home/ec2-user/short_interest_effect/airflow' >> /root/.bashrc
+         source /root/.bashrc
          #
-         echo 'export PATH=/usr/local/bin:$PATH' >> /home/ec2-user/.bash_profile
-         echo 'export AIRFLOW_HOME=/home/ec2-user/short_interest_effect/airflow' >> /home/ec2-user/.bash_profile
+         echo 'export PATH=/usr/local/bin:$PATH' >> /home/ec2-user/.bashrc
+         echo 'export AIRFLOW_HOME=/home/ec2-user/short_interest_effect/airflow' >> /home/ec2-user/.bashrc
          #
          # Update configuration files
          cp /home/ec2-user/short_interest_effect/airflow/config.cfg.default /home/ec2-user/short_interest_effect/airflow/config.cfg
@@ -147,6 +155,8 @@ Resources:
          sed -i -e '/AWS_ACCESS_KEY_ID=/ s|=.*|=${AWSAccessKeyID}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
          sed -i -e '/AWS_SECRET_ACCESS_KEY=/ s|=.*|=${AWSSecretAccessKey}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
          sed -i -e '/REGION_NAME=/ s|=.*|=${AWS::Region}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/STOCK_LIMITS=/ s|=.*|=${StockLimits}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/STOCKS=/ s|=.*|=${Stocks}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
          #
          # Initialize Airflow
          airflow initdb
@@ -168,6 +178,7 @@ Resources:
          sed -i -e '/access_logfile/ s/=.*/=\/home\/ec2-user\/log\/access\.log/' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
          #
          airflow initdb
+         chmod -R 777 /home/ec2-user/short_interest_effect
          # Run Airflow webserver
          airflow webserver
     Metadata:
