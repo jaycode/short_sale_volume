@@ -9,7 +9,6 @@ YST_MONTH = int(YESTERDAY_DATE.split('-')[1]) - 1
 YST_YEAR = YESTERDAY_DATE.split('-')[0]
 
 create_table = not(spark_table_exists(DB_HOST, TABLE_STOCK_PRICES))
-logger.warn("HELLO1")
 def pull_prices_by_symbol(symbol):
     """
     Return:
@@ -41,7 +40,6 @@ def pull_prices_by_symbol(symbol):
 
 schema = T.StringType()
 udf_pull_prices = F.udf(pull_prices_by_symbol, schema)
-logger.warn("HELLO2")
     
 # Prepare list of stocks
 if STOCKS is not None and len(STOCKS) > 0:
@@ -49,8 +47,8 @@ if STOCKS is not None and len(STOCKS) > 0:
     row_rdd = rdd1.map(lambda x: Row(x))
     df = spark.createDataFrame(row_rdd,['Symbol'])
 else:
-    df = spark.read.parquet(DB_HOST+TABLE_STOCK_INFO_NASDAQ,
-                            DB_HOST+TABLE_STOCK_INFO_NYSE) \
+    df = spark.read.csv([DB_HOST+TABLE_STOCK_INFO_NASDAQ,
+                        DB_HOST+TABLE_STOCK_INFO_NYSE], header=True) \
          .select('Symbol').dropDuplicates()
     if LIMIT is not None:
         df = df.limit(LIMIT)

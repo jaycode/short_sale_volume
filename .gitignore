@@ -4,4 +4,4 @@ airflow/airflow-webserver.pid
 airflow/airflow.db
 airflow/*.cfg
 test_data/*
-default.yaml
+default.yml

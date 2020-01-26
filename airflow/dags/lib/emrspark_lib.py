@@ -320,7 +320,8 @@ def wait_for_spark(master_dns, session_headers, port=8998):
     logging.info("Session headers: {}".format(session_headers))
     session_url = spark_url(master_dns, location=session_headers['Location'], port=port)
     while status not in ['idle', 'dead']:
-        response = requests.get(session_url, headers=session_headers)
+        # response = requests.get(session_url, headers=session_headers)
+        response = requests.get(session_url)
         status = response.json()['state']
         logging.info("Spark session status: {}".format(status))
         if status == 'dead':
@@ -328,7 +329,7 @@ def wait_for_spark(master_dns, session_headers, port=8998):
             del(response_json['code'])
             raise Exception("Spark session is dead:\nResponse status code: {}\nHeaders: {}\nContent: {}" \
                             .format(response.status_code, response.headers, response_json))
-        else:
+        elif status != 'idle':
             time.sleep(5)
 # ------------
 

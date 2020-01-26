@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
-Description: Airflow server backed by Postgres RDS
+Description: Airflow server
 
 Parameters:
   KeyName:
@@ -11,17 +11,16 @@ Parameters:
     Description: REQUIRED - Can be a local path or S3 bucket path (With format "s3a://<bucket-name>" DO NOT END with "/"). This path will be used to read and write the short interest dataset.
     Type: String
     AllowedPattern: '.+'
-    Default: s3a://short-interest-effect
   QuandlAPIKey:
     Description: REQUIRED - Quandl API Key
     NoEcho: 'true'
     Type: String
     AllowedPattern: '.+'
   AWSAccessKeyID:
-    Description: AWS Access Key ID that can access S3 bucket set in "OutputDBHost"
+    Description: AWS Access Key ID that can access S3 bucket set in "OutputDBHost" and create EMR cluster.
     Type: String
   AWSSecretAccessKey:
-    Description: AWS Secret Access Key that can access S3 bucket set in "OutputDBHost"
+    Description: AWS Secret Access Key that can access S3 bucket set in "OutputDBHost" and create EMR cluster.
     NoEcho: 'true'
     Type: String
   AirflowDBPassword:
@@ -39,6 +38,22 @@ Parameters:
   SubnetId:
     Type: AWS::EC2::Subnet::Id
     Description: Subnet of the EC2 server. Must belong in VPC from which you set VPCId from
+  InstanceType:
+    Type: String
+    Default: t3.small
+    Description: t2.micro is not enough to run both scheduler and webserver, but it is useful for debugging aws-cf_template.yml
+    AllowedValues:
+      - t2.micro
+      - t3.small
+      - t3.medium
+  StockLimits:
+    Type: String
+    AllowedPattern: '[ 0-9]*'
+    Description: Number of stocks to pull. Set to empty for all stocks
+  Stocks:
+    Type: String
+    Default: '[]'
+    Description: Pull only the following stocks. Overrides StockLimits. All stocks if empty
 # Mapping to find the Amazon Linux AMI in each region.
 Mappings:
   RegionMap:
@@ -58,7 +73,7 @@ Resources:
     Properties:
       KeyName: !Ref 'KeyName'
       SecurityGroupIds: [!GetAtt AirflowEC2SecurityGroup.GroupId]
-      InstanceType: 't2.micro'
+      InstanceType: !Ref 'InstanceType'
       SubnetId: !Ref 'SubnetId'
       IamInstanceProfile:
         Ref: EC2InstanceProfile
@@ -84,7 +99,6 @@ Resources:
          #
          # Install Python3
          sudo yum install -y python36
-         sudo yum install -y python36-pip
          #
          # Install PostgreSQL
          sudo yum install -y postgresql postgresql-server postgresql-devel postgresql-contrib postgresql-docs
@@ -110,40 +124,61 @@ Resources:
          # Install git
          sudo yum install -y git
          # Download pipeline code
+         cd /home/ec2-user
          git clone -b aws-latest https://github.com/jaycode/short_interest_effect.git
-         cd short_interest_effect
+         cd /home/ec2-user/short_interest_effect
+         sudo chmod -R 777 /home/ec2-user/short_interest_effect
          # Install boto3
-         sudo pip3 install boto3
+         sudo python3 -m pip install boto3
          # Install airflow using pip
          echo "Install Apache Airflow"
-         sudo SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install -U apache-airflow
+         sudo yum install -y python36-devel
+         sudo SLUGIFY_USES_TEXT_UNIDECODE=yes python3 -m pip install -U apache-airflow
          # Airflow installation
-         sudo pip3 install apache-airflow[crypto,s3,postgres]
-         sudo -H pip3 install six==1.10.0
-         sudo pip3 install --upgrade six
-         sudo pip3 install markupsafe
-         sudo pip3 install --upgrade MarkupSafe
-         echo 'export PATH=/usr/local/bin:$PATH' >> /root/.bash_profile
-         source /root/.bash_profile
+         sudo python3 -m pip install apache-airflow[crypto,s3,postgres]
+         sudo -H python3 -m pip install six==1.10.0
+         sudo python3 -m pip install --upgrade six
+         sudo python3 -m pip install markupsafe
+         sudo python3 -m pip install --upgrade MarkupSafe
+         echo 'export PATH=/usr/local/bin:$PATH' >> /root/.bashrc
+         echo 'export AIRFLOW_HOME=/home/ec2-user/short_interest_effect/airflow' >> /root/.bashrc
+         source /root/.bashrc
+         #
+         echo 'export PATH=/usr/local/bin:$PATH' >> /home/ec2-user/.bashrc
+         echo 'export AIRFLOW_HOME=/home/ec2-user/short_interest_effect/airflow' >> /home/ec2-user/.bashrc
+         #
+         # Update configuration files
+         cp /home/ec2-user/short_interest_effect/airflow/config.cfg.default /home/ec2-user/short_interest_effect/airflow/config.cfg
+         # Use | as delimiter instead of / because OutputDBHost may have forward slashes
+         sed -i -e '/DB_HOST=/ s|=.*|=${OutputDBHost}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/API_KEY=/ s|=.*|=${QuandlAPIKey}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/AWS_ACCESS_KEY_ID=/ s|=.*|=${AWSAccessKeyID}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/AWS_SECRET_ACCESS_KEY=/ s|=.*|=${AWSSecretAccessKey}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/REGION_NAME=/ s|=.*|=${AWS::Region}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/STOCK_LIMITS=/ s|=.*|=${StockLimits}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/STOCKS=/ s|=.*|=${Stocks}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         #
          # Initialize Airflow
          airflow initdb
-         # Update the RDS connection in the Airflow Config file
-         sed -i '/sql_alchemy_conn/s/^/#/g' airflow/airflow.cfg
-         sed -i '/sql_alchemy_conn/ a sql_alchemy_conn = postgresql://airflow:${AirflowDBPassword}@127.0.0.1:5432/airflowdb' airflow/airflow.cfg
+         #
+         # Update the database connection in the Airflow Config file
+         sed -i '/sql_alchemy_conn/s/^/#/g' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         sed -i '/sql_alchemy_conn/ a sql_alchemy_conn = postgresql://airflow:${AirflowDBPassword}@127.0.0.1:5432/airflowdb' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
          # Update the type of executor in the Airflow Config file
-         sed -i '/executor = SequentialExecutor/s/^/#/g' airflow/airflow.cfg
-         sed -i '/executor = SequentialExecutor/ a executor = LocalExecutor' airflow/airflow.cfg
+         sed -i '/executor = SequentialExecutor/s/^/#/g' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         sed -i '/executor = SequentialExecutor/ a executor = LocalExecutor' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
          # Hide examples
-         sed -i '/load_examples = True/s/^/#/g' airflow/airflow.cfg
-         sed -i '/load_examples = True/ a load_examples = False' airflow/airflow.cfg
+         sed -i '/load_examples = True/s/^/#/g' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         sed -i '/load_examples = True/ a load_examples = False' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         # Setup webserver log
+         mkdir -p /home/ec2-user/log
+         touch /home/ec2-user/log/access.log
+         chmod 777 /home/ec2-user/log
+         chmod 777 /home/ec2-user/log/access.log
+         sed -i -e '/access_logfile/ s/=.*/=\/home\/ec2-user\/log\/access\.log/' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         #
          airflow initdb
-         # Update configuration files
-         cp airflow/config.cfg.default airflow/config.cfg
-         sed -i -e '/DB_HOST=/ s/=.*/=${OutputDBHost}/' airflow/config.cfg
-         sed -i -e '/API_KEY=/ s/=.*/=${QuandlAPIKey}/' airflow/config.cfg
-         sed -i -e '/AWS_ACCESS_KEY_ID=/ s/=.*/=${AWSAccessKeyID}/' airflow/config.cfg
-         sed -i -e '/AWS_SECRET_ACCESS_KEY=/ s/=.*/=${AWSSecretAccessKey}/' airflow/config.cfg
-         sed -i -e '/REGION_NAME=/ s/=.*/=${AWS::Region}/' airflow/config.cfg
+         chmod -R 777 /home/ec2-user/short_interest_effect
          # Run Airflow webserver
          airflow webserver
     Metadata:

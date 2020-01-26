@@ -19,8 +19,8 @@ The pipeline consists of the following tasks:
 1. Cluster DAG creates Amazon EMR server, then it waits for the other DAGs to complete.
 2. If `STOCKS` configuration in `airflow/airflow.cfg` has not been filled with stock symbols, pull list of stock information from 
    old NASDAQ links for both NYSE and NASDAQ exchanges. The links as follows:
-   - NASDAQ: **https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=nasdaq&render=download**
-   - NYSE': **https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=nyse&render=download**
+    - NASDAQ: https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=nasdaq&render=download
+    - NYSE: https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=nyse&render=download
 3. Short Interest DAG: Pull short interest data from [Quandl's Financial Industry Regulatory Authority's short interest data](https://www.quandl.com/data/FINRA-Financial-Industry-Regulatory-Authority). Store the data in S3 server (or locally, depending on the setting in `config.cfg`).
 4. Prices DAG: Pull pricing data from QuoteMedia, store as CSV.
 5. Combine DAG: Combine the short interests and stock price data.
@@ -35,11 +35,39 @@ The pipeline is to be run once a day at 00:00. On the first run, it gets all dat
 2. Create a CloudFormation stack from `basic_network.yml` template. This is a generic VPC configuration with 2 private and 2 public subnets which should be quite useful for other similar projects too. I recommend setting the stack name with something generic, like "BasicNetwork".
 3. Create a CloudFormation stack from `aws-cf_template.yml`. Pass in your Quandl key and AWS Access ID and Private Access Key. I would name this stack with a specific project's name like "ShortInterests".
 4. After the stack created, go to the "Outputs" tab to get the URL of the Airflow admin, something like `http://ec2-3-219-234-248.compute-1.amazonaws.com:8080`. You can get the endpoint from there, which you can use to SSH connect.
+    ```
+    chmod 400 ~/path/to/airflow_pem.pem
+    ssh -i "~/path/to/airflow_pem.pem" ec2-user@ec2-3-219-234-248.compute-1.amazonaws.com
+    ```
+
+5. Connect via ssh to the server. Note that the Airflow admin may likely not to be ready just yet, because there may be some code that are still running on the EC2 server. To check on the progress, SSH connect to the EC2 instance, then run this command `cat /var/log/user-data.log` to see the entire log, or `tail /var/log/user-data.log` to view the last few lines.
+6. Once the Airflow webserver is ready (check the file `/var/log/user-data.log` a few times until there are no changes), run the following commands on the server to run Airflow Scheduler:
+
+    ```
+    source ~/.bashrc
+    airflow scheduler -D
+    aws configure
+    ```
+
+    Then enter your AWS credentials and default region. If you got the following error:
+
+    ```
+    Warning: You have two airflow.cfg files: /home/ec2-user/airflow/airflow.cfg and /home/ec2-user/short_interest_effect/airflow/airflow.cfg. Airflow used to look at ~/airflow/airflow.cfg, even when AIRFLOW_HOME was set to a different value. Airflow will now only read /home/ec2-user/short_interest_effect/airflow/airflow.cfg, and you should remove the other file
+    ```
+
+    Run this code:
+    ```
+    rm -r airflow 
+    ```
+
+    Before running the scheduler.
+
+
+To kill Airflow scheduler:
+
 ```
-chmod 400 ~/path/to/airflow_pem.pem
-ssh -i "~/path/to/airflow_pem.pem" ec2-user@ec2-3-219-234-248.compute-1.amazonaws.com
-``` 
-5. Note that the Airflow admin may likely not to be ready just yet, because there may be some code that are still running on the EC2 server. To check on the progress, SSH connect to the EC2 instance, then run this command `cat /var/log/user-data.log` to see the entire log, or `tail /var/log/user-data.log` to view the last few lines.
+$ kill $(ps -ef | grep "airflow scheduler" | awk '{print $2}')
+```
 
 ## Other Scenarios
 
