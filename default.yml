@@ -1,0 +1,227 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: Airflow server
+
+Parameters:
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access into the Airflow web server
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: Must be the name of an existing EC2 KeyPair
+  OutputDBHost:
+    Description: REQUIRED - Can be a local path or S3 bucket path (With format "s3a://<bucket-name>" DO NOT END with "/"). This path will be used to read and write the short interest dataset.
+    Type: String
+    AllowedPattern: '.+'
+    Default: s3a://short-interest-effect
+  QuandlAPIKey:
+    Description: REQUIRED - Quandl API Key
+    NoEcho: 'true'
+    Type: String
+    AllowedPattern: '.+'
+    Default: zhiR5Rz7eFUy_XNcZb2f
+  AWSAccessKeyID:
+    Description: AWS Access Key ID that can access S3 bucket set in "OutputDBHost"
+    Type: String
+    Default: AKIAZ7YWVG74R2JETMVE
+  AWSSecretAccessKey:
+    Description: AWS Secret Access Key that can access S3 bucket set in "OutputDBHost"
+    NoEcho: 'true'
+    Type: String
+    Default: 99sUi8+AyBJnLiPOxIFy+aR8KDd/Dlk7n+opLlZM
+  AirflowDBPassword:
+    Default: airflowpassword
+    NoEcho: 'true'
+    Description: Airflow database admin account password
+    Type: String
+    MinLength: '8'
+    MaxLength: '41'
+    AllowedPattern: '[a-zA-Z0-9]*'
+    ConstraintDescription: Must contain only alphanumeric characters
+  VPCId:
+    Type: AWS::EC2::VPC::Id
+    Default: 'vpc-0682389ead6518753'
+    Description: VPC of the EC2 server
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subnet of the EC2 server. Must belong in VPC from which you set VPCId from
+    Default: 'subnet-0aff7b9e1274947db'
+# Mapping to find the Amazon Linux AMI in each region.
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-09d069a04349dc3cb
+    us-east-2:
+      AMI: ami-0d542ef84ec55d71c
+    us-west-1:
+      AMI: ami-04bc3da8f14823e88
+    us-west-2:
+      AMI: ami-01460aa81365561fe
+    ap-southeast-1:
+      AMI: ami-0d9233e8ce73df7b2
+Resources:
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      KeyName: !Ref 'KeyName'
+      SecurityGroupIds: [!GetAtt AirflowEC2SecurityGroup.GroupId]
+      InstanceType: 't2.micro'
+      SubnetId: !Ref 'SubnetId'
+      IamInstanceProfile:
+        Ref: EC2InstanceProfile
+      Tags:
+        -
+          Key: Name
+          Value: Airflow
+      ImageId: !FindInMap
+        - RegionMap
+        - !Ref 'AWS::Region'
+        - AMI
+      UserData:
+        Fn::Base64: !Sub |
+         #!/bin/bash
+         set -x
+         # To debug the outputs, run `cat /var/log/user-data.log`
+         exec > >(tee /var/log/user-data.log|logger -t user-data ) 2>&1
+         # Get the latest CloudFormation package
+         echo "Installing aws-cfn"
+         yum install -y aws-cfn-bootstrap
+         # Start cfn-init
+         /opt/aws/bin/cfn-init -v -c install --stack ${AWS::StackId} --resource EC2Instance --region ${AWS::Region}
+         #
+         # Install Python3
+         sudo yum install -y python36
+         #
+         # Install PostgreSQL
+         sudo yum install -y postgresql postgresql-server postgresql-devel postgresql-contrib postgresql-docs
+         sudo service postgresql initdb
+         # Edit pg_hba.conf file
+         #   Update the line that contains "local   all..." by replacing "peer" with "trust"
+         sudo sed -i -e '/local   all             all/ s/peer/trust/' /var/lib/pgsql9/data/pg_hba.conf
+         #   Update the line that contains "host    all...::1/128..." by replacing "ident" with "md5"
+         sudo sed -i -e '/host    all             all             \:\:1\/128/ s/ident/md5/' /var/lib/pgsql9/data/pg_hba.conf
+         #   Delete line that contains '127.0.0.1/32':
+         sudo sed -i '/127\.0\.0\.1\/32/d' /var/lib/pgsql9/data/pg_hba.conf
+         #   Add line under "# IPv4 local connections:"
+         sudo sed -i '/\# IPv4 local connections\:/ a host    all             airflow      0\.0\.0\.0\/0               md5' /var/lib/pgsql9/data/pg_hba.conf
+         # Update postgresql.conf to (locally) listen to port 5432
+         sudo sed -i -e '/\#listen_addresses/ s/\#l/l/' /var/lib/pgsql9/data/postgresql.conf
+         sudo sed -i -e '/\#port \= 5432/ s/\#//' /var/lib/pgsql9/data/postgresql.conf
+         # Start PostgreSQL service
+         sudo service postgresql start
+         # Create user and database for airflow db
+         sudo -u postgres psql -c "CREATE USER airflow WITH PASSWORD '${AirflowDBPassword}';"
+         sudo -u postgres psql -c "CREATE DATABASE airflowdb OWNER airflow;"
+         # 
+         # Install git
+         sudo yum install -y git
+         # Download pipeline code
+         cd /home/ec2-user
+         git clone -b aws-latest https://github.com/jaycode/short_interest_effect.git
+         cd /home/ec2-user/short_interest_effect
+         sudo chmod 777 /home/ec2-user/short_interest_effect/*
+         # Install boto3
+         sudo python3 -m pip install boto3
+         # Install airflow using pip
+         echo "Install Apache Airflow"
+         sudo yum install -y python36-devel
+         sudo SLUGIFY_USES_TEXT_UNIDECODE=yes python3 -m pip install -U apache-airflow
+         # Airflow installation
+         sudo python3 -m pip install apache-airflow[crypto,s3,postgres]
+         sudo -H python3 -m pip install six==1.10.0
+         sudo python3 -m pip install --upgrade six
+         sudo python3 -m pip install markupsafe
+         sudo python3 -m pip install --upgrade MarkupSafe
+         echo 'export PATH=/usr/local/bin:$PATH' >> /root/.bash_profile
+         echo 'export AIRFLOW_HOME=/home/ec2-user/short_interest_effect/airflow' >> /root/.bash_profile
+         source /root/.bash_profile
+         #
+         echo 'export PATH=/usr/local/bin:$PATH' >> /home/ec2-user/.bash_profile
+         echo 'export AIRFLOW_HOME=/home/ec2-user/short_interest_effect/airflow' >> /home/ec2-user/.bash_profile
+         #
+         # Initialize Airflow
+         airflow initdb
+         #
+         # Update the database connection in the Airflow Config file
+         sed -i '/sql_alchemy_conn/s/^/#/g' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         sed -i '/sql_alchemy_conn/ a sql_alchemy_conn = postgresql://airflow:${AirflowDBPassword}@127.0.0.1:5432/airflowdb' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         # Update the type of executor in the Airflow Config file
+         sed -i '/executor = SequentialExecutor/s/^/#/g' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         sed -i '/executor = SequentialExecutor/ a executor = LocalExecutor' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         # Hide examples
+         sed -i '/load_examples = True/s/^/#/g' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         sed -i '/load_examples = True/ a load_examples = False' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         # Setup webserver log
+         mkdir -p /home/ec2-user/log
+         touch /home/ec2-user/log/access.log
+         chmod 777 /home/ec2-user/log
+         chmod 777 /home/ec2-user/log/access.log
+         sed -i -e '/access_logfile/ s/=.*/=\/home\/ec2-user\/log\/access\.log/' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         #
+         airflow initdb
+         # Update configuration files
+         cp /home/ec2-user/short_interest_effect/airflow/config.cfg.default /home/ec2-user/short_interest_effect/airflow/config.cfg
+         # Use | as delimiter instead of / because OutputDBHost may have forward slashes
+         sed -i -e '/DB_HOST=/ s|=.*|=${OutputDBHost}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/API_KEY=/ s|=.*|=${QuandlAPIKey}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/AWS_ACCESS_KEY_ID=/ s|=.*|=${AWSAccessKeyID}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/AWS_SECRET_ACCESS_KEY=/ s|=.*|=${AWSSecretAccessKey}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/REGION_NAME=/ s|=.*|=${AWS::Region}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         # Run Airflow webserver
+         airflow webserver
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          install:
+            - gcc
+        gcc:
+          packages:
+            yum:
+              gcc: []
+    DependsOn:
+      - AirflowEC2SecurityGroup
+  AirflowEC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: AirflowEC2SG
+      GroupDescription: Enable HTTP access via port 80 + SSH access
+      VpcId: !Ref 'VPCId'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AirflowInstanceRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AmazonElasticMapReduceFullAccess
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: AirflowInstanceProfile
+      Roles:
+        -
+          Ref: EC2Role
+Outputs:
+  AirflowEC2PublicDNSName:
+    Description: Public DNS Name of the Airflow EC2 instance
+    Value: !Join ["", ["http://", !GetAtt EC2Instance.PublicDnsName, ":8080"]]
