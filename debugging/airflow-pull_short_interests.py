@@ -75,7 +75,7 @@ session_headers = emrs.create_spark_session(cluster_dns)
 emrs.wait_for_spark(cluster_dns, session_headers)
 job_response_headers = emrs.submit_spark_job_from_file(
         cluster_dns, session_headers,
-        'airflow/dags/etl/pull_short_interests.py',
+        'pull_short_interests-debug.py',
         args=args_si,
         commonpath='airflow/dags/etl/common.py',
         helperspath='airflow/dags/etl/helpers.py'
