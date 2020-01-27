@@ -1,8 +1,8 @@
 import sys
 sys.path.append("../airflow/dags/lib")
+import emrspark_lib as emrs
 import os
 os.chdir('../')
-import emrspark_lib as emrs
 import configparser
 import time
 
