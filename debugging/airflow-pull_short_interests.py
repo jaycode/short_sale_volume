@@ -12,7 +12,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 config = configparser.ConfigParser()
-config.read('airflow/config.cfg')
+config.read('../airflow/config.cfg')
 
 CLUSTER_NAME = config['AWS']['CLUSTER_NAME']
 VPC_ID = config['AWS']['VPC_ID']
