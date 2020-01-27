@@ -25,6 +25,11 @@ if config['App']['STOCKS'] == '':
 else:
     STOCKS = json.loads(config.get('App', 'STOCKS').replace("'", '"'))
 
+if config['App']['STOCK_LIMITS'] == '':
+    LIMIT = None
+else:
+    LIMIT = int(config['App']['STOCK_LIMITS'])
+
 
 default_args = {
     'owner': 'jaycode',
@@ -139,7 +144,7 @@ pull_pricing_data_task = PythonOperator(
             'START_DATE': config['App']['START_DATE'],
             'QUANDL_API_KEY': config['Quandl']['API_KEY'],
             'YESTERDAY_DATE': '{{yesterday_ds}}',
-            'LIMIT': config['App']['STOCK_LIMITS'],
+            'LIMIT': LIMIT,
             'STOCKS': STOCKS,
             'AWS_ACCESS_KEY_ID': config['AWS']['AWS_ACCESS_KEY_ID'],
             'AWS_SECRET_ACCESS_KEY': config['AWS']['AWS_SECRET_ACCESS_KEY'],
