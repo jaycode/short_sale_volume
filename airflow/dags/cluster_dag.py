@@ -51,14 +51,6 @@ dag = DAG('cluster_dag',
 )
 
 
-ec2, emr, iam = emrs.get_boto_clients(config['AWS']['REGION_NAME'], config=config)
-
-if VPC_ID == '':
-    VPC_ID = emrs.get_first_available_vpc(ec2)
-
-if SUBNET_ID == '':
-    SUBNET_ID = emrs.get_first_available_subnet(ec2, VPC_ID)
-
 
 def preparation(**kwargs):
     Variable.delete('cluster_id')
@@ -68,6 +60,14 @@ def preparation(**kwargs):
     Variable.delete('short_interests_dag_state')
     Variable.delete('prices_dag_state')
     Variable.delete('combine_dag_state')
+
+    ec2, emr, iam = emrs.get_boto_clients(config['AWS']['REGION_NAME'], config=config)
+
+    if VPC_ID == '':
+        VPC_ID = emrs.get_first_available_vpc(ec2)
+
+    if SUBNET_ID == '':
+        SUBNET_ID = emrs.get_first_available_subnet(ec2, VPC_ID)
 
     master_sg_id = emrs.create_security_group(ec2, '{}SG'.format(CLUSTER_NAME),
         'Master SG for {}'.format(CLUSTER_NAME), VPC_ID)

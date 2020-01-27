@@ -51,9 +51,10 @@ dag = DAG('short_interests_dag',
           max_active_runs=1
 )
 
-ec2, emr, iam = emrs.get_boto_clients(config['AWS']['REGION_NAME'], config=config)
 
 def submit_spark_job_from_file(**kwargs):
+    ec2, emr, iam = emrs.get_boto_clients(config['AWS']['REGION_NAME'], config=config)
+    
     if emrs.is_cluster_terminated(emr, Variable.get('cluster_id', None)):
         Variable.set('short_interests_dag_state', 'FAILED')
         raise AirflowException("Cluster has been terminated. Redo all DAGs.")
