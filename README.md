@@ -69,6 +69,13 @@ To kill Airflow scheduler:
 $ kill $(ps -ef | grep "airflow scheduler" | awk '{print $2}')
 ```
 
+## Troubleshootings
+
+
+> botocore.exceptions.ClientError: An error occurred (ValidationException) when calling the RunJobFlow operation: Invalid InstanceProfile: EMR_EC2_DefaultRole.
+
+It's likely `EMR_EC2_DefaultRole` instance profile is not ready yet when we create the cluster. Clear the `create_cluster_task` from `cluster_dag` and wait for it being re-run.
+
 ## Other Scenarios
 
 ### 1. What if the data were increased by 100x?

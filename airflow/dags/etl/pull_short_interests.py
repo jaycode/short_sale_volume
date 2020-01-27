@@ -60,11 +60,11 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
     for i, symbol in enumerate(symbols):
         if table_exists:
             # Get the last date of a stock. If this last date >= YESTERDAY_DATE, don't do anything.
-            dates = short_sdf.select('Date').where((short_sdf.Symbol == F.lit(symbol))).orderBy(F.desc('Date')).limit(1) \
-                .rdd.map(lambda r: r['Date']).collect()
+            dates = short_sdf.select('Date').where(short_sdf.Symbol == F.lit(symbol)) \
+                .orderBy(F.desc('Date')).take(1)
             if len(dates) > 0:
-                if a_before_b(dates[0], YESTERDAY_DATE):
-                    data = pull_exchange_short_interests_by_symbol(symbol, dates[0], YESTERDAY_DATE)
+                if a_before_b(dates[0].Date, YESTERDAY_DATE):
+                    data = pull_exchange_short_interests_by_symbol(symbol, dates[0].Date, YESTERDAY_DATE)
                 else:
                     data = []
             else:
