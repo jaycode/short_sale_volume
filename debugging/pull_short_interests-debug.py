@@ -52,9 +52,9 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
             df = df.limit(LIMIT)
     symbols = df.select('Symbol').rdd.map(lambda r: r['Symbol']).collect()
     
-    print("check table exists for host: {}, path: {}".format(host, short_interests_table_path))
 
     table_exists = spark_table_exists(host, short_interests_table_path)
+    print("check table exists for host: {}, path: {}, result: {}".format(host, short_interests_table_path, table_exists))
     if table_exists:
         short_sdf = spark.read.csv(host+short_interests_table_path, header=True)
         
