@@ -1,5 +1,7 @@
 import sys
-sys.path.append("../airflow/dags/lib"); sys.path.append("../")
+sys.path.append("../airflow/dags/lib")
+import os
+os.chdir('../')
 import emrspark_lib as emrs
 import configparser
 import time
@@ -12,7 +14,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 config = configparser.ConfigParser()
-config.read('../airflow/config.cfg')
+config.read('airflow/config.cfg')
 
 CLUSTER_NAME = config['AWS']['CLUSTER_NAME']
 VPC_ID = config['AWS']['VPC_ID']
