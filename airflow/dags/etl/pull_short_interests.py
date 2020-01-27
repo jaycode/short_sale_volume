@@ -72,12 +72,12 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
         else:
             data = pull_exchange_short_interests_by_symbol(symbol, START_DATE, YESTERDAY_DATE)
         total_rows += len(data)
-        if (i%log_every_n == 0):
+        if (i%log_every_n == 0 or (i+1) == len(symbols)):
             logger.warn("{}/{} - total rows in this batch: {}".format(i+1, len(symbols), total_rows))
         
-        if len(data) > 0:
-            short_sdf = spark.createDataFrame(data)
-            short_sdf.write.mode('append').format('csv').save(host+short_interests_table_path, header=True)
+        # if len(data) > 0:
+        #     short_sdf = spark.createDataFrame(data)
+        #     short_sdf.write.mode('append').format('csv').save(host+short_interests_table_path, header=True)
     logger.warn("done!")
 
 pull_short_interests('FNSQ', DB_HOST, TABLE_STOCK_INFO_NASDAQ, TABLE_SHORT_INTERESTS_NASDAQ)
