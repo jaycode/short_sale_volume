@@ -1,5 +1,5 @@
 import sys
-sys.path.append("../airflow/dags/lib")
+sys.path.append("../airflow/dags/lib"); sys.path.append("../")
 import emrspark_lib as emrs
 import configparser
 import time
@@ -12,7 +12,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 config = configparser.ConfigParser()
-config.read('../airflow/config.cfg')
+config.read('airflow/config.cfg')
 
 CLUSTER_NAME = config['AWS']['CLUSTER_NAME']
 VPC_ID = config['AWS']['VPC_ID']
@@ -51,9 +51,21 @@ cluster_dns = emrs.get_cluster_dns(emr, cluster_id)
 
 #####
 
-args = {
+args_si = {
+    'START_DATE': config['App']['START_DATE'],
+    'QUANDL_API_KEY': config['Quandl']['API_KEY'],
+    'YESTERDAY_DATE': '2020-12-10',
+#     'LIMIT': config['App']['STOCK_LIMITS'],
+#     'STOCKS': STOCKS,
+    'LIMIT': None,
+    'STOCKS': [],
     'AWS_ACCESS_KEY_ID': config['AWS']['AWS_ACCESS_KEY_ID'],
-    'AWS_SECRET_ACCESS_KEY': config['AWS']['AWS_SECRET_ACCESS_KEY']
+    'AWS_SECRET_ACCESS_KEY': config['AWS']['AWS_SECRET_ACCESS_KEY'],
+    'DB_HOST': config['App']['DB_HOST'],
+    'TABLE_STOCK_INFO_NASDAQ': config['App']['TABLE_STOCK_INFO_NASDAQ'],
+    'TABLE_STOCK_INFO_NYSE': config['App']['TABLE_STOCK_INFO_NYSE'],
+    'TABLE_SHORT_INTERESTS_NASDAQ': config['App']['TABLE_SHORT_INTERESTS_NASDAQ'],
+    'TABLE_SHORT_INTERESTS_NYSE': config['App']['TABLE_SHORT_INTERESTS_NYSE'],
 }
 
 emrs.kill_all_inactive_spark_sessions(cluster_dns)
@@ -61,8 +73,8 @@ session_headers = emrs.create_spark_session(cluster_dns)
 emrs.wait_for_spark(cluster_dns, session_headers)
 job_response_headers = emrs.submit_spark_job_from_file(
         cluster_dns, session_headers,
-        'spark_table_exists-debug.py',
-        args=args,
+        'airflow/dags/etl/pull_short_interests.py',
+        args=args_si,
         commonpath='airflow/dags/etl/common.py',
         helperspath='airflow/dags/etl/helpers.py'
 )
