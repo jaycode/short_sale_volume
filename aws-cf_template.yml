@@ -54,6 +54,17 @@ Parameters:
     Type: String
     Default: '[]'
     Description: Pull only the following stocks. Overrides StockLimits. All stocks if empty
+  EMRNumCoreNodes:
+    Type: Number
+    Default: 10
+    Description: Number of EMR cores
+  EMRCoreNodeInstanceType:
+    Type: String
+    Default: m3.xlarge
+    Description: EMR core instance type
+    AllowedValues:
+      - m3.xlarge
+      - c3.xlarge
 # Mapping to find the Amazon Linux AMI in each region.
 Mappings:
   RegionMap:
@@ -96,6 +107,11 @@ Resources:
          yum install -y aws-cfn-bootstrap
          # Start cfn-init
          /opt/aws/bin/cfn-init -v -c install --stack ${AWS::StackId} --resource EC2Instance --region ${AWS::Region}
+         #
+         # Configure AWS
+         aws configure set aws_access_key_id ${AWSAccessKeyID}
+         aws configure set aws_secret_access_key ${AWSSecretAccessKey}
+         aws configure set region ${AWS::Region}
          #
          # Install Python3
          sudo yum install -y python36
@@ -157,6 +173,8 @@ Resources:
          sed -i -e '/REGION_NAME=/ s|=.*|=${AWS::Region}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
          sed -i -e '/STOCK_LIMITS=/ s|=.*|=${StockLimits}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
          sed -i -e '/STOCKS=/ s|=.*|=${Stocks}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/EMR_NUM_CORE_NODES=/ s|=.*|=${EMRNumCoreNodes}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/EMR_CORE_NODE_INSTANCE_TYPE=/ s|=.*|=${EMRCoreNodeInstanceType}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
          #
          # Initialize Airflow
          airflow initdb

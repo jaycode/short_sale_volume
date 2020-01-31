@@ -406,12 +406,19 @@ def track_spark_job(master_dns, job_response_headers, port=8998):
         # a statement URL that can be pooled until it is complete:
         statement_response = requests.get(statement_url, headers={'Content-Type': 'application/json'})
         response_json = statement_response.json()
-        job_status = response_json['state']
-        del(response_json['code'])
-        logging.info('Spark Job status: ' + job_status)
+        if isinstance(response_json, str):
+            logging.info("response is a string:")
+            logging.info(response)
+        else:
+            job_status = response_json['state']
+            del(response_json['code'])
+
+            logging.info('Spark Job status: ' + job_status)
+            if 'progress' in response_json:
+                progress = str(response_json['progress'])
+                logging.info('Progress: {}'.format(progress))
+
         logging.info("Response: {}".format(pformat(response_json)))
-        if 'progress' in statement_response.json():
-            logging.info('Progress: ' + str(response_json['progress']))
 
         if job_status == 'idle':
             raise ValueError("track_spark_job error. Looks like you have passed spark session headers for the second parameter. "+
