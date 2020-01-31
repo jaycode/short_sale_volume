@@ -5,3 +5,4 @@ airflow/airflow.db
 airflow/*.cfg
 test_data/*
 default.yml
+*.pyc
