@@ -25,6 +25,9 @@ AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
 REGION_NAME=us-east-1
 CLUSTER_NAME=ShortInterestEffectDL
-OUTPUT_DATA=s3a://short-interest-effect/data/
+EMR_NUM_CORE_NODES=10
+EMR_CORE_NODE_INSTANCE_TYPE=m3.xlarge
+
+# These two can be left empty
 VPC_ID=
 SUBNET_ID=

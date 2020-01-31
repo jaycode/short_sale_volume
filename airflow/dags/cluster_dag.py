@@ -87,7 +87,9 @@ def create_cluster(**kwargs):
     cluster_id = emrs.create_emr_cluster(emr, CLUSTER_NAME,
         Variable.get('master_sg_id'),
         Variable.get('slave_sg_id'),
-        Variable.get('keypair_name'), SUBNET_ID)
+        Variable.get('keypair_name'), SUBNET_ID,
+        num_core_nodes=config['AWS']['EMR_NUM_CORE_NODES'],
+        core_node_instance_type=config['AWS']['EMR_CORE_NODE_INSTANCE_TYPE'])
         # release_label='emr-5.28.1')
     Variable.set('cluster_id', cluster_id)
 
