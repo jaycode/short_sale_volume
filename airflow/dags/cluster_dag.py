@@ -44,6 +44,9 @@ dag = DAG('cluster_dag',
 
 
 def preparation(**kwargs):
+    # Without this global setting, this DAG on EC2 server got the following error:
+    #     UnboundLocalError: local variable 'VPC_ID' referenced before assignment
+    global VPC_ID, SUBNET_ID, CLUSTER_NAME
     Variable.delete('cluster_id')
     Variable.delete('keypair_name')
     Variable.delete('master_sg_id')
@@ -75,12 +78,13 @@ def preparation(**kwargs):
 
 
 def create_cluster(**kwargs):
+    logging.info("instance type is "+config['AWS']['EMR_CORE_NODE_INSTANCE_TYPE'])
+    ec2, emr, iam = emrs.get_boto_clients(config['AWS']['REGION_NAME'], config=config)
     cluster_id = emrs.create_emr_cluster(emr, CLUSTER_NAME,
         Variable.get('master_sg_id'),
         Variable.get('slave_sg_id'),
-        Variable.get('keypair_name'), SUBNET_ID,
-        num_core_nodes=config['AWS']['EMR_NUM_CORE_NODES'],
-        core_node_instance_type=config['AWS']['EMR_CORE_NODE_INSTANCE_TYPE'])
+        Variable.get('keypair_name'), SUBNET_ID
+    )
         # release_label='emr-5.28.1')
     Variable.set('cluster_id', cluster_id)
 

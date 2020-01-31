@@ -69,6 +69,12 @@ To kill Airflow scheduler:
 $ kill $(ps -ef | grep "airflow scheduler" | awk '{print $2}')
 ```
 
+To kill Airflow webserver:
+
+```
+$ cat $AIRFLOW_HOME/airflow-webserver.pid | sudo xargs kill -9
+```
+
 ## Troubleshootings
 
 
