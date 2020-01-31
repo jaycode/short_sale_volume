@@ -10,26 +10,11 @@ import lib.emrspark_lib as emrs
 from airflow.configuration import conf as airflow_config
 
 import logging
-import configparser
-import json
 
 from airflow.utils import timezone
 yesterday = timezone.utcnow() - timedelta(days=2)
 
-config = configparser.ConfigParser()
-airflow_dir = os.path.split(airflow_config['core']['dags_folder'])[0]
-config.read('{}/config.cfg'.format(airflow_dir))
-
-if config['App']['STOCKS'] == '':
-    STOCKS = []
-else:
-    STOCKS = json.loads(config.get('App', 'STOCKS').replace("'", '"'))
-
-if config['App']['STOCK_LIMITS'] == '':
-    LIMIT = None
-else:
-    LIMIT = int(config['App']['STOCK_LIMITS'])
-    
+from lib.common import *
 
 default_args = {
     'owner': 'jaycode',

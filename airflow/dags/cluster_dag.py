@@ -4,14 +4,12 @@ This DAG deals with cluster creation and then wait for the other DAGs to complet
 before terminating all created objects, including EMR cluster, key pairs,
 and security groups.
 """
-import os
 from datetime import timedelta
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from airflow.operators.custom_operators import VariableExistenceSensor
 from airflow.models import Variable
 import lib.emrspark_lib as emrs
-import configparser
 import time
 from airflow.configuration import conf as airflow_config
 
@@ -21,14 +19,7 @@ import os
 from airflow.utils import timezone
 yesterday = timezone.utcnow() - timedelta(days=2)
 
-config = configparser.ConfigParser()
-airflow_dir = os.path.split(airflow_config['core']['dags_folder'])[0]
-config.read('{}/config.cfg'.format(airflow_dir))
-
-CLUSTER_NAME = config['AWS']['CLUSTER_NAME']
-VPC_ID = config['AWS']['VPC_ID']
-SUBNET_ID = config['AWS']['SUBNET_ID']
-
+from lib.common import *
 
 default_args = {
     'owner': 'jaycode',
