@@ -56,7 +56,7 @@ Parameters:
     Description: Pull only the following stocks. Overrides StockLimits. All stocks if empty
   EMRNumCoreNodes:
     Type: Number
-    Default: 10
+    Default: 3
     Description: Number of EMR cores
   EMRCoreNodeInstanceType:
     Type: String
@@ -175,6 +175,8 @@ Resources:
          sed -i -e '/STOCKS=/ s|=.*|=${Stocks}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
          sed -i -e '/EMR_NUM_CORE_NODES=/ s|=.*|=${EMRNumCoreNodes}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
          sed -i -e '/EMR_CORE_NODE_INSTANCE_TYPE=/ s|=.*|=${EMRCoreNodeInstanceType}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/VPC_ID=/ s|=.*|=${VPCId}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/SUBNET_ID=/ s|=.*|=${SubnetId}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
          #
          # Initialize Airflow
          airflow initdb
