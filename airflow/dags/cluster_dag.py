@@ -80,6 +80,7 @@ def preparation(**kwargs):
 def create_cluster(**kwargs):
     logging.info("instance type is "+config['AWS']['EMR_CORE_NODE_INSTANCE_TYPE'])
     ec2, emr, iam = emrs.get_boto_clients(config['AWS']['REGION_NAME'], config=config)
+    emrs.wait_for_roles(iam)
     cluster_id = emrs.create_emr_cluster(emr, CLUSTER_NAME,
         Variable.get('master_sg_id'),
         Variable.get('slave_sg_id'),

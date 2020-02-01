@@ -70,7 +70,8 @@ def create_security_group(ec2_client, name, desc, vpc_id, ip=None):
         # Do not create if we found an existing Security Group
         response = ec2_client.describe_security_groups(
             Filters=[
-                {'Name':'group-name', 'Values': [name]}
+                {'Name':'group-name', 'Values': [name]},
+                {'Name': 'vpc-id', 'Values': [vpc_id]}
             ]
         )
         groups = response['SecurityGroups']
@@ -166,6 +167,18 @@ def recreate_key_pair(ec2_client, key_name):
     keypair = ec2_client.create_key_pair(KeyName=key_name)
     logging.info("keypair {} created:\n{}".format(key_name, keypair))
     return keypair
+
+
+def wait_for_roles(iam_client, job_flow_role='EMR_EC2_DefaultRole', service_role='EMR_DefaultRole'):
+    role_names = [job_flow_role, service_role]
+    for role_name in role_names:
+        role = iam_client.get_role(RoleName=role_name)
+        if 'Arn' in role['Role']:
+            logging.info("Role {} is ready".format(role_name))
+            pass
+        else:
+            logging.info("Role {} is not ready. Waiting...".format(role_name))
+            time.sleep(1)
 # ------------
 
 
