@@ -40,9 +40,10 @@ master_sg_id = emrs.create_security_group(ec2, '{}SG'.format(CLUSTER_NAME),
 slave_sg_id = emrs.create_security_group(ec2, '{}SlaveSG'.format(CLUSTER_NAME),
     'Slave SG for {}'.format(CLUSTER_NAME), VPC_ID)
 
-keypair = emrs.recreate_key_pair(ec2, '{}_pem'.format(CLUSTER_NAME))
+keypair = emrs.create_key_pair(ec2, '{}_pem'.format(CLUSTER_NAME))
 
-emrs.recreate_default_roles(iam)
+emrs.create_default_roles(iam)
+emrs.wait_for_roles(iam)
 
 cluster_id = emrs.create_emr_cluster(emr, CLUSTER_NAME,
                 master_sg_id,

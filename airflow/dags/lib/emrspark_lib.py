@@ -45,15 +45,13 @@ def get_first_available_subnet(ec2_client, vpc_id):
 
 # Create Security Group
 # ------------
-def create_security_group(ec2_client, name, desc, vpc_id, ip=None):
+def create_security_group(ec2_client, name, desc, vpc_id):
     """ Create a security group
     Args:
         - ec2_client (boto3.EC2.Client): EC2 client object.
         - name (string): Name of Security Group
         - desc (string): Description of Security Group
         - vpc_id (string): Name of VPC. If empty, use the first available VPC
-        - ip (string): The IP address of this machine. Only this machine can connect to the cluster.
-                       If empty, use https://api.ipify.org service to get public IP address.
     Return:
     
         dict: {
@@ -75,9 +73,6 @@ def create_security_group(ec2_client, name, desc, vpc_id, ip=None):
             ]
         )
         groups = response['SecurityGroups']
-
-        if ip is None:
-            ip = requests.get('https://api.ipify.org').text
 
         if len(groups) > 0:
             # Update the rule to use the new IP address
@@ -107,7 +102,7 @@ def create_security_group(ec2_client, name, desc, vpc_id, ip=None):
                     {'IpProtocol': 'tcp',
                      'FromPort': 8998,
                      'ToPort': 8998,
-                     'IpRanges': [{'CidrIp': '{}/32'.format(ip)}]}
+                     'IpRanges': [{'CidrIp': '0.0.0.0/0'}]}
                 ])
             return groups[0]['GroupId']
         else:
@@ -123,7 +118,7 @@ def create_security_group(ec2_client, name, desc, vpc_id, ip=None):
                     {'IpProtocol': 'tcp',
                      'FromPort': 8998,
                      'ToPort': 8998,
-                     'IpRanges': [{'CidrIp': '{}/32'.format(ip)}]}
+                     'IpRanges': [{'CidrIp': '0.0.0.0/0'}]}
                 ])
             return security_group_id
     except ClientError as e:
