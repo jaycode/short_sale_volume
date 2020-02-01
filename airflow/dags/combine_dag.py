@@ -11,15 +11,11 @@ from airflow.configuration import conf as airflow_config
 import boto3
 
 import logging
-import configparser
-import json
 
 from airflow.utils import timezone
 yesterday = timezone.utcnow() - timedelta(days=2)
 
-config = configparser.ConfigParser()
-airflow_dir = os.path.split(airflow_config['core']['dags_folder'])[0]
-config.read('{}/config.cfg'.format(airflow_dir))
+from lib.common import *
 
 default_args = {
     'owner': 'jaycode',

@@ -27,7 +27,9 @@ Resources:
       Properties:
         VpcId: !Ref VPC
         CidrBlock: 10.1.10.0/24
-        AvailabilityZone: !Select [ 0, !GetAZs ]    # Get the first AZ in the list      
+        # Get the second AZ in the list, because the first AZ would give this error when creating EMR for us-east-1:
+        # The requested instance type m3.xlarge is not supported in the requested availability zone
+        AvailabilityZone: !Select [ 1, !GetAZs ]    
         MapPublicIpOnLaunch: true
         Tags:
         - Key: Name
@@ -37,7 +39,7 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       CidrBlock: 10.1.20.0/24
-      AvailabilityZone: !Select [ 1, !GetAZs ]    # Get the second AZ in the list 
+      AvailabilityZone: !Select [ 2, !GetAZs ]    # Get the third AZ in the list 
       MapPublicIpOnLaunch: true
       Tags:
       - Key: Name
@@ -47,7 +49,7 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       CidrBlock: 10.1.50.0/24
-      AvailabilityZone: !Select [ 0, !GetAZs ]    # Get the first AZ in the list 
+      AvailabilityZone: !Select [ 1, !GetAZs ]    # Get the second AZ in the list 
       Tags:
       - Key: Name
         Value: !Sub ${AWS::StackName}-Private-A
@@ -56,7 +58,7 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       CidrBlock: 10.1.60.0/24
-      AvailabilityZone: !Select [ 1, !GetAZs ]    # Get the second AZ in the list 
+      AvailabilityZone: !Select [ 2, !GetAZs ]    # Get the third AZ in the list 
       Tags:
       - Key: Name
         Value: !Sub ${AWS::StackName}-Private-B

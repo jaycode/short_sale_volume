@@ -45,15 +45,13 @@ def get_first_available_subnet(ec2_client, vpc_id):
 
 # Create Security Group
 # ------------
-def create_security_group(ec2_client, name, desc, vpc_id, ip=None):
+def create_security_group(ec2_client, name, desc, vpc_id):
     """ Create a security group
     Args:
         - ec2_client (boto3.EC2.Client): EC2 client object.
         - name (string): Name of Security Group
         - desc (string): Description of Security Group
         - vpc_id (string): Name of VPC. If empty, use the first available VPC
-        - ip (string): The IP address of this machine. Only this machine can connect to the cluster.
-                       If empty, use https://api.ipify.org service to get public IP address.
     Return:
     
         dict: {
@@ -70,13 +68,11 @@ def create_security_group(ec2_client, name, desc, vpc_id, ip=None):
         # Do not create if we found an existing Security Group
         response = ec2_client.describe_security_groups(
             Filters=[
-                {'Name':'group-name', 'Values': [name]}
+                {'Name':'group-name', 'Values': [name]},
+                {'Name': 'vpc-id', 'Values': [vpc_id]}
             ]
         )
         groups = response['SecurityGroups']
-
-        if ip is None:
-            ip = requests.get('https://api.ipify.org').text
 
         if len(groups) > 0:
             # Update the rule to use the new IP address
@@ -106,7 +102,7 @@ def create_security_group(ec2_client, name, desc, vpc_id, ip=None):
                     {'IpProtocol': 'tcp',
                      'FromPort': 8998,
                      'ToPort': 8998,
-                     'IpRanges': [{'CidrIp': '{}/32'.format(ip)}]}
+                     'IpRanges': [{'CidrIp': '0.0.0.0/0'}]}
                 ])
             return groups[0]['GroupId']
         else:
@@ -122,7 +118,7 @@ def create_security_group(ec2_client, name, desc, vpc_id, ip=None):
                     {'IpProtocol': 'tcp',
                      'FromPort': 8998,
                      'ToPort': 8998,
-                     'IpRanges': [{'CidrIp': '{}/32'.format(ip)}]}
+                     'IpRanges': [{'CidrIp': '0.0.0.0/0'}]}
                 ])
             return security_group_id
     except ClientError as e:
@@ -133,8 +129,7 @@ def create_security_group(ec2_client, name, desc, vpc_id, ip=None):
 
 # Recreate Default Roles and Key Pair
 # ------------
-def recreate_default_roles(iam_client):
-    # Recreate default roles
+def delete_default_roles(iam_client):
     try:
         iam_client.remove_role_from_instance_profile(InstanceProfileName='EMR_EC2_DefaultRole', RoleName='EMR_EC2_DefaultRole')
         iam_client.delete_instance_profile(InstanceProfileName='EMR_EC2_DefaultRole')
@@ -144,11 +139,19 @@ def recreate_default_roles(iam_client):
         iam_client.delete_role(RoleName='EMR_DefaultRole')
     except iam_client.exceptions.NoSuchEntityException:
         pass
-    logging.info("Output of recreate_default_roles:\n{}".format(
-        json.loads(subprocess.check_output(['aws', 'emr', 'create-default-roles']))))
+
+def create_default_roles(iam_client):
+    # Recreate default roles
+    try:
+        job_flow_role = iam_client.get_role(RoleName='EMR_EC2_DefaultRole')
+        service_role = iam_client.get_role(RoleName='EMR_DefaultRole')
+        instance_profile = iam_client.get_instance_profile(InstanceProfileName='EMR_EC2_DefaultRole')
+    except iam_client.exceptions.NoSuchEntityException:
+        logging.info("Output of create_default_roles:\n{}".format(
+            json.loads(subprocess.check_output(['aws', 'emr', 'create-default-roles']))))
 
 
-def recreate_key_pair(ec2_client, key_name):
+def create_key_pair(ec2_client, key_name):
     """
     Args:
         - ec2_client (boto3.EC2.Client): EC2 client object.
@@ -162,10 +165,41 @@ def recreate_key_pair(ec2_client, key_name):
             'KeyPairId': 'string'
         }
     """
-    ec2_client.delete_key_pair(KeyName=key_name)
-    keypair = ec2_client.create_key_pair(KeyName=key_name)
-    logging.info("keypair {} created:\n{}".format(key_name, keypair))
+    response = ec2_client.describe_key_pairs(Filters=[
+        {'Name': 'key-name',
+         'Values': [key_name]
+        }
+    ])
+    keypairs = response['KeyPairs']
+    if len(keypairs) == 0:
+        keypair = ec2_client.create_key_pair(KeyName=key_name)
+        logging.info("keypair {} created:\n{}".format(key_name, keypair))
+    else:
+        keypair = keypairs[0]
     return keypair
+
+
+def wait_for_roles(iam_client, job_flow_role_name='EMR_EC2_DefaultRole', service_role_name='EMR_DefaultRole', instance_profile_name='EMR_EC2_DefaultRole'):
+    role_names = [job_flow_role_name, service_role_name]
+    ok = False
+    while ok == False:
+        ok = True
+        for role_name in role_names:
+            try:
+                role = iam_client.get_role(RoleName=role_name)
+                logging.info("Role {} is ready".format(role_name))
+            except iam_client.exceptions.NoSuchEntityException:
+                logging.info("Role {} is not ready. Waiting...".format(role_name))
+                ok = False
+        try:
+            instance_profile = iam_client.get_instance_profile(InstanceProfileName=instance_profile_name)
+            logging.info("Instance Profile {} is ready".format(instance_profile_name))
+        except iam_client.exceptions.NoSuchEntityException:
+            logging.info("Instance Profile {} is not ready. Waiting...".format(instance_profile_name))
+            ok = False
+            
+        if ok == False:
+            time.sleep(1)
 # ------------
 
 
@@ -199,43 +233,53 @@ def create_emr_cluster(emr_client, cluster_name, master_sg, slave_sg, keypair_na
         return active_clusters[0]['Id']
     else:
         # Create cluster
-        cluster_response = emr_client.run_job_flow(
-            Name=cluster_name,
-            ReleaseLabel=release_label,
-            Instances={
-                'InstanceGroups': [
-                    {
-                        'Name': "Master nodes",
-                        'Market': 'ON_DEMAND',
-                        'InstanceRole': 'MASTER',
-                        'InstanceType': master_instance_type,
-                        'InstanceCount': 1
+
+        # To avoid error:
+        #    botocore.exceptions.ClientError: An error occurred (ValidationException) when calling the RunJobFlow operation: Invalid InstanceProfile: EMR_EC2_DefaultRole.
+        # We use do while in here
+        ok = False
+        while ok == False:
+            try:
+                cluster_response = emr_client.run_job_flow(
+                    Name=cluster_name,
+                    ReleaseLabel=release_label,
+                    Instances={
+                        'InstanceGroups': [
+                            {
+                                'Name': "Master nodes",
+                                'Market': 'ON_DEMAND',
+                                'InstanceRole': 'MASTER',
+                                'InstanceType': master_instance_type,
+                                'InstanceCount': 1
+                            },
+                            {
+                                'Name': "Slave nodes",
+                                'Market': 'ON_DEMAND',
+                                'InstanceRole': 'CORE',
+                                'InstanceType': core_node_instance_type,
+                                'InstanceCount': num_core_nodes
+                            }
+                        ],
+                        'KeepJobFlowAliveWhenNoSteps': True,
+                        'Ec2SubnetId': subnet_id,
+                        'Ec2KeyName' : keypair_name,
+                        'EmrManagedMasterSecurityGroup': master_sg,
+                        'EmrManagedSlaveSecurityGroup': slave_sg
                     },
-                    {
-                        'Name': "Slave nodes",
-                        'Market': 'ON_DEMAND',
-                        'InstanceRole': 'CORE',
-                        'InstanceType': core_node_instance_type,
-                        'InstanceCount': num_core_nodes
-                    }
-                ],
-                'KeepJobFlowAliveWhenNoSteps': True,
-                'Ec2SubnetId': subnet_id,
-                'Ec2KeyName' : keypair_name,
-                'EmrManagedMasterSecurityGroup': master_sg,
-                'EmrManagedSlaveSecurityGroup': slave_sg
-            },
-            VisibleToAllUsers=True,
-            JobFlowRole=job_flow_role,
-            ServiceRole=service_role,
-            Applications=[
-                { 'Name': 'hadoop' },
-                { 'Name': 'spark' },
-                { 'Name': 'hive' },
-                { 'Name': 'livy' },
-                { 'Name': 'zeppelin' }
-            ]
-        )
+                    VisibleToAllUsers=True,
+                    JobFlowRole=job_flow_role,
+                    ServiceRole=service_role,
+                    Applications=[
+                        { 'Name': 'hadoop' },
+                        { 'Name': 'spark' },
+                        { 'Name': 'hive' },
+                        { 'Name': 'livy' },
+                        { 'Name': 'zeppelin' }
+                    ]
+                )
+                ok = True
+            except ClientError as e:
+                logging.info(e)
         cluster_id = cluster_response['JobFlowId']
         cluster_state = get_cluster_status(emr_client, cluster_id)
         if cluster_state != 'STARTING':
@@ -326,7 +370,6 @@ def wait_for_spark(master_dns, session_headers, port=8998):
         logging.info("Spark session status: {}".format(status))
         if status == 'dead':
             response_json = response.json()
-            del(response_json['code'])
             raise Exception("Spark session is dead:\nResponse status code: {}\nHeaders: {}\nContent: {}" \
                             .format(response.status_code, response.headers, response_json))
         elif status != 'idle':
