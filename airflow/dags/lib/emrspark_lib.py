@@ -169,15 +169,25 @@ def recreate_key_pair(ec2_client, key_name):
     return keypair
 
 
-def wait_for_roles(iam_client, job_flow_role='EMR_EC2_DefaultRole', service_role='EMR_DefaultRole'):
+def wait_for_roles(iam_client, job_flow_role='EMR_EC2_DefaultRole', service_role='EMR_DefaultRole', instance_profile_name='EMR_EC2_DefaultRole'):
     role_names = [job_flow_role, service_role]
-    for role_name in role_names:
-        role = iam_client.get_role(RoleName=role_name)
-        if 'Arn' in role['Role']:
-            logging.info("Role {} is ready".format(role_name))
-            pass
+    ok = False
+    while ok == False:
+        ok = True
+        for role_name in role_names:
+            role = iam_client.get_role(RoleName=role_name)
+            if 'Arn' in role['Role']:
+                logging.info("Role {} is ready".format(role_name))
+            else:
+                logging.info("Role {} is not ready. Waiting...".format(role_name))
+                ok = False
+        instance_profile = iam_client.get_instance_profile(InstanceProfileName=instance_profile_name)
+        if 'Arn' in instance_profile['InstanceProfile']:
+            logging.info("Instance Profile {} is ready".format(instance_profile_name))
         else:
-            logging.info("Role {} is not ready. Waiting...".format(role_name))
+            logging.info("Instance Profile {} is not ready. Waiting...".format(instance_profile_name))
+            ok = False
+        if ok == False:
             time.sleep(1)
 # ------------
 
@@ -212,43 +222,53 @@ def create_emr_cluster(emr_client, cluster_name, master_sg, slave_sg, keypair_na
         return active_clusters[0]['Id']
     else:
         # Create cluster
-        cluster_response = emr_client.run_job_flow(
-            Name=cluster_name,
-            ReleaseLabel=release_label,
-            Instances={
-                'InstanceGroups': [
-                    {
-                        'Name': "Master nodes",
-                        'Market': 'ON_DEMAND',
-                        'InstanceRole': 'MASTER',
-                        'InstanceType': master_instance_type,
-                        'InstanceCount': 1
+
+        # To avoid error:
+        #    botocore.exceptions.ClientError: An error occurred (ValidationException) when calling the RunJobFlow operation: Invalid InstanceProfile: EMR_EC2_DefaultRole.
+        # We use do while in here
+        ok = False
+        while ok == False:
+            try:
+                cluster_response = emr_client.run_job_flow(
+                    Name=cluster_name,
+                    ReleaseLabel=release_label,
+                    Instances={
+                        'InstanceGroups': [
+                            {
+                                'Name': "Master nodes",
+                                'Market': 'ON_DEMAND',
+                                'InstanceRole': 'MASTER',
+                                'InstanceType': master_instance_type,
+                                'InstanceCount': 1
+                            },
+                            {
+                                'Name': "Slave nodes",
+                                'Market': 'ON_DEMAND',
+                                'InstanceRole': 'CORE',
+                                'InstanceType': core_node_instance_type,
+                                'InstanceCount': num_core_nodes
+                            }
+                        ],
+                        'KeepJobFlowAliveWhenNoSteps': True,
+                        'Ec2SubnetId': subnet_id,
+                        'Ec2KeyName' : keypair_name,
+                        'EmrManagedMasterSecurityGroup': master_sg,
+                        'EmrManagedSlaveSecurityGroup': slave_sg
                     },
-                    {
-                        'Name': "Slave nodes",
-                        'Market': 'ON_DEMAND',
-                        'InstanceRole': 'CORE',
-                        'InstanceType': core_node_instance_type,
-                        'InstanceCount': num_core_nodes
-                    }
-                ],
-                'KeepJobFlowAliveWhenNoSteps': True,
-                'Ec2SubnetId': subnet_id,
-                'Ec2KeyName' : keypair_name,
-                'EmrManagedMasterSecurityGroup': master_sg,
-                'EmrManagedSlaveSecurityGroup': slave_sg
-            },
-            VisibleToAllUsers=True,
-            JobFlowRole=job_flow_role,
-            ServiceRole=service_role,
-            Applications=[
-                { 'Name': 'hadoop' },
-                { 'Name': 'spark' },
-                { 'Name': 'hive' },
-                { 'Name': 'livy' },
-                { 'Name': 'zeppelin' }
-            ]
-        )
+                    VisibleToAllUsers=True,
+                    JobFlowRole=job_flow_role,
+                    ServiceRole=service_role,
+                    Applications=[
+                        { 'Name': 'hadoop' },
+                        { 'Name': 'spark' },
+                        { 'Name': 'hive' },
+                        { 'Name': 'livy' },
+                        { 'Name': 'zeppelin' }
+                    ]
+                )
+                ok = True
+            except ClientError as e:
+                logging.info(e)
         cluster_id = cluster_response['JobFlowId']
         cluster_state = get_cluster_status(emr_client, cluster_id)
         if cluster_state != 'STARTING':
