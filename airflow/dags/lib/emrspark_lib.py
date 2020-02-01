@@ -451,7 +451,7 @@ def track_spark_job(master_dns, job_response_headers, port=8998):
         response_json = statement_response.json()
         if isinstance(response_json, str):
             logging.info("response is a string:")
-            logging.info(response)
+            logging.info(statement_response)
         else:
             job_status = response_json['state']
             del(response_json['code'])
