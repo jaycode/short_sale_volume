@@ -71,10 +71,10 @@ def preparation(**kwargs):
     Variable.set('master_sg_id', master_sg_id)
     Variable.set('slave_sg_id', slave_sg_id)
 
-    keypair = emrs.recreate_key_pair(ec2, '{}_pem'.format(CLUSTER_NAME))
+    keypair = emrs.create_key_pair(ec2, '{}_pem'.format(CLUSTER_NAME))
     Variable.set('keypair_name', keypair['KeyName'])
 
-    emrs.recreate_default_roles(iam)
+    emrs.create_default_roles(iam)
 
 
 def create_cluster(**kwargs):

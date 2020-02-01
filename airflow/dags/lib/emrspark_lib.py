@@ -134,8 +134,7 @@ def create_security_group(ec2_client, name, desc, vpc_id, ip=None):
 
 # Recreate Default Roles and Key Pair
 # ------------
-def recreate_default_roles(iam_client):
-    # Recreate default roles
+def delete_default_roles(iam_client):
     try:
         iam_client.remove_role_from_instance_profile(InstanceProfileName='EMR_EC2_DefaultRole', RoleName='EMR_EC2_DefaultRole')
         iam_client.delete_instance_profile(InstanceProfileName='EMR_EC2_DefaultRole')
@@ -145,11 +144,19 @@ def recreate_default_roles(iam_client):
         iam_client.delete_role(RoleName='EMR_DefaultRole')
     except iam_client.exceptions.NoSuchEntityException:
         pass
-    logging.info("Output of recreate_default_roles:\n{}".format(
-        json.loads(subprocess.check_output(['aws', 'emr', 'create-default-roles']))))
+
+def create_default_roles(iam_client):
+    # Recreate default roles
+    try:
+        job_flow_role = iam_client.get_role(RoleName='EMR_EC2_DefaultRole')
+        service_role = iam_client.get_role(RoleName='EMR_DefaultRole')
+        instance_profile = iam_client.get_instance_profile(InstanceProfileName='EMR_EC2_DefaultRole')
+    except iam_client.exceptions.NoSuchEntityException:
+        logging.info("Output of create_default_roles:\n{}".format(
+            json.loads(subprocess.check_output(['aws', 'emr', 'create-default-roles']))))
 
 
-def recreate_key_pair(ec2_client, key_name):
+def create_key_pair(ec2_client, key_name):
     """
     Args:
         - ec2_client (boto3.EC2.Client): EC2 client object.
@@ -163,30 +170,39 @@ def recreate_key_pair(ec2_client, key_name):
             'KeyPairId': 'string'
         }
     """
-    ec2_client.delete_key_pair(KeyName=key_name)
-    keypair = ec2_client.create_key_pair(KeyName=key_name)
-    logging.info("keypair {} created:\n{}".format(key_name, keypair))
+    response = ec2_client.describe_key_pairs(Filters=[
+        {'Name': 'key-name',
+         'Values': [key_name]
+        }
+    ])
+    keypairs = response['KeyPairs']
+    if len(keypairs) == 0:
+        keypair = ec2_client.create_key_pair(KeyName=key_name)
+        logging.info("keypair {} created:\n{}".format(key_name, keypair))
+    else:
+        keypair = keypairs[0]
     return keypair
 
 
-def wait_for_roles(iam_client, job_flow_role='EMR_EC2_DefaultRole', service_role='EMR_DefaultRole', instance_profile_name='EMR_EC2_DefaultRole'):
-    role_names = [job_flow_role, service_role]
+def wait_for_roles(iam_client, job_flow_role_name='EMR_EC2_DefaultRole', service_role_name='EMR_DefaultRole', instance_profile_name='EMR_EC2_DefaultRole'):
+    role_names = [job_flow_role_name, service_role_name]
     ok = False
     while ok == False:
         ok = True
         for role_name in role_names:
-            role = iam_client.get_role(RoleName=role_name)
-            if 'Arn' in role['Role']:
+            try:
+                role = iam_client.get_role(RoleName=role_name)
                 logging.info("Role {} is ready".format(role_name))
-            else:
+            except iam_client.exceptions.NoSuchEntityException:
                 logging.info("Role {} is not ready. Waiting...".format(role_name))
                 ok = False
-        instance_profile = iam_client.get_instance_profile(InstanceProfileName=instance_profile_name)
-        if 'Arn' in instance_profile['InstanceProfile']:
+        try:
+            instance_profile = iam_client.get_instance_profile(InstanceProfileName=instance_profile_name)
             logging.info("Instance Profile {} is ready".format(instance_profile_name))
-        else:
+        except iam_client.exceptions.NoSuchEntityException:
             logging.info("Instance Profile {} is not ready. Waiting...".format(instance_profile_name))
             ok = False
+            
         if ok == False:
             time.sleep(1)
 # ------------
