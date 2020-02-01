@@ -91,10 +91,12 @@ def create_cluster(**kwargs):
 
 
 def terminate_cluster(**kwargs):
+    ec2, emr, iam = emrs.get_boto_clients(config['AWS']['REGION_NAME'], config=config)
     emrs.delete_cluster(emr, Variable.get('cluster_id'))
 
 
 def cleanup(**kwargs):
+    ec2, emr, iam = emrs.get_boto_clients(config['AWS']['REGION_NAME'], config=config)
     ec2.delete_key_pair(KeyName=Variable.get('keypair_name'))
     emrs.delete_security_group(ec2, Variable.get('master_sg_id'))
     time.sleep(2)
