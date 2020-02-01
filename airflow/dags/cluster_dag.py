@@ -91,8 +91,7 @@ def create_cluster(**kwargs):
 
 
 def terminate_cluster(**kwargs):
-    if Variable.get('combine_dag_state') == '':
-        emrs.delete_cluster(emr, Variable.get('cluster_id'))
+    emrs.delete_cluster(emr, Variable.get('cluster_id'))
 
 
 def cleanup(**kwargs):
