@@ -73,7 +73,7 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
             data = pull_exchange_short_interests_by_symbol(symbol, START_DATE, YESTERDAY_DATE)
         total_rows += len(data)
         if (i%log_every_n == 0 or (i+1) == len(symbols)):
-            logger.warn("{}/{} - total rows in this batch: {}".format(i+1, len(symbols), total_rows))
+            logger.warn("downloading from exchange {} - {}/{} - total rows in this batch: {}".format(exchange, i+1, len(symbols), total_rows))
         
         if len(data) > 0:
             short_sdf = spark.createDataFrame(data)
