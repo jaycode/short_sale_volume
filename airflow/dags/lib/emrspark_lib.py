@@ -437,6 +437,17 @@ def submit_spark_job_from_file(master_dns, session_headers, filepath, args={}, h
 # ------------
 
 
+def get_logstr_with_content(log_lines, content):
+    """ To get content with WARN:
+
+        get_log_with_content(log_lines, 'WARN')
+    """
+    important = ""
+    for line in log_lines:
+        if content in line:
+            important += (line) + "\n"
+    return important
+
 # Track Spark Job Status
 # ------------
 def track_spark_job(master_dns, job_response_headers, port=8998):
@@ -469,7 +480,8 @@ def track_spark_job(master_dns, job_response_headers, port=8998):
             # Get the logs
             log_lines = requests.get(session_url + '/log', 
                                      headers={'Content-Type': 'application/json'}).json()['log']
-            logging.info("Log from the cluster:\n{}".format("\n".join(log_lines)))
+
+            logging.info("Log from the cluster:\n{}".format(get_logstr_with_content(log_lines, 'WARN')))
             logging.info('Final job Status: ' + job_status)
 
 
