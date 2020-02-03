@@ -464,6 +464,13 @@ def track_spark_job(master_dns, job_response_headers, port=8998):
         if isinstance(response_json, str):
             logging.info("response is a string:")
             logging.info(statement_response)
+        elif 'state' not in response_json:
+            logging.info("Response json does not contain `state` key. Response content:")
+            try:
+                del(response_json['code'])
+            except Exception as e:
+                pass
+            logging.info(pformat(response_json))
         else:
             job_status = response_json['state']
             del(response_json['code'])
