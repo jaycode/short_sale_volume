@@ -56,7 +56,7 @@ Parameters:
     Description: Pull only the following stocks. Overrides StockLimits. All stocks if empty
   EMRNumCoreNodes:
     Type: Number
-    Default: 3
+    Default: 5
     Description: Number of EMR cores
   EMRCoreNodeInstanceType:
     Type: String
