@@ -452,7 +452,7 @@ def get_logstr_with_content(log_lines, content):
 
 # Track Spark Job Status
 # ------------
-def track_spark_job(master_dns, job_response_headers, port=8998):
+def track_spark_job(master_dns, job_response_headers, port=8998, sleep_seconds=600):
     job_status = ''
     session_url = spark_url(master_dns, location=job_response_headers['Location'].split('/statements', 1)[0], port=port)
     statement_url = spark_url(master_dns, location=job_response_headers['Location'], port=port)
@@ -499,7 +499,7 @@ def track_spark_job(master_dns, job_response_headers, port=8998):
                              "Pass in spark job response headers instead.")
 
         if job_status != 'available':
-            time.sleep(5)
+            time.sleep(sleep_seconds)
             
     final_job_status = response_json['output']['status']
 
