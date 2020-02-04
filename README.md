@@ -73,8 +73,33 @@ To kill Airflow webserver:
 $ cat $AIRFLOW_HOME/airflow-webserver.pid | sudo xargs kill -9
 ```
 
-## Troubleshootings
+## FAQs
 
+### Where can I see the progress of the pulling process?
+
+Click on the DAG's name, then on either Graph View or Tree View, click on the currently running task, then click on "View Log". You will need to keep refreshing and view the bottom of the page to check on the progress. **The status is updated every 10 minutes.**
+
+Here is an example of outputs from the log for short interests:
+
+```
+20/02/04 16:27:59 WARN DAG: downloading from exchange FNSQ - 1801/3621 - total rows in this batch: 1814543
+20/02/04 16:49:11 WARN DAG: downloading from exchange FNSQ - 1901/3621 - total rows in this batch: 1937516
+20/02/04 17:10:13 WARN DAG: downloading from exchange FNSQ - 2001/3621 - total rows in this batch: 2046578
+```
+
+Notice that it took about 20 minutes to pull 110,000 - 120,000 data points.
+
+
+### Can I resize the size of EMR? Will it affect the running speed?
+
+Yes, you may do it through the EMR cluster page, then click on Hardware. However, currently, changing it to anything above 3 nodes won't increase the speed of downloading short interest data. The bottleneck lies in the network connection between EMR cluster's master node and Quandle or QuoteMedia server.
+
+**Todo: Parallelize the requests to Quandl by using UDF (user-defined-function) to perform GET requests through slave nodes. The initial version of the code is stored in `airflow/dags/etl/pull_short_interests-udf.py`. It does not currently have any sort of reporting to tell us the progress as we pull the data, and, more critically, it creates duplicates for existing data.**
+
+As a reference, with 3-10 EMR cluster's slave nodes, it takes between 20 to 40 minutes to load about 110,000 short interest data (100 companies on a fresh start between 2013-04-01 and 2020-02-04).
+
+
+## Troubleshootings
 
 > botocore.exceptions.ClientError: An error occurred (ValidationException) when calling the RunJobFlow operation: Invalid InstanceProfile: EMR_EC2_DefaultRole.
 
