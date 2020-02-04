@@ -200,7 +200,11 @@ Resources:
          airflow initdb
          chmod -R 777 /home/ec2-user/short_interest_effect
          # Run Airflow webserver
-         airflow webserver
+         airflow webserver -D
+         sudo -u ec2-user -s source /home/ec-user/.bashrc
+         sudo -u ec2-user -s aws configure set aws_access_key_id ${AWSAccessKeyID}
+         sudo -u ec2-user -s aws configure set aws_secret_access_key ${AWSSecretAccessKey}
+         sudo -u ec2-user -s aws configure set default.region ${AWS::Region}
     Metadata:
       AWS::CloudFormation::Init:
         configSets:

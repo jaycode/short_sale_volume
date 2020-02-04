@@ -90,10 +90,10 @@ wait_for_fresh_run_task = VariableExistenceSensor(
     dag=dag
 )
 
-wait_for_cluster_task = VariableExistenceSensor(
-    task_id='Wait_for_cluster',
+wait_for_short_interests_task = VariableExistenceSensor(
+    task_id='Wait_for_short_interests',
     poke_interval=120,
-    varnames=['cluster_id'],
+    varnames=['short_interests_dag_state'],
     mode='reschedule',
     dag=dag
 )
@@ -166,5 +166,5 @@ quality_check_task = PythonOperator(
     dag=dag
 )
 
-wait_for_fresh_run_task >> wait_for_cluster_task >> \
+wait_for_fresh_run_task >> wait_for_short_interests_task >> \
 pull_stock_symbols_task >> pull_pricing_data_task >> quality_check_task

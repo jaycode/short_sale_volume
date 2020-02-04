@@ -275,7 +275,9 @@ def create_emr_cluster(emr_client, cluster_name, master_sg, slave_sg, keypair_na
                         { 'Name': 'hive' },
                         { 'Name': 'livy' },
                         { 'Name': 'zeppelin' }
-                    ]
+                    ],
+                    # To fix Invalid status code '400': "requirement failed: Session isn't active."
+                    Configurations=[{'Classification': 'livy-conf','Properties': {'livy.server.session.timeout':'100h'}}]
                 )
                 ok = True
             except ClientError as e:
@@ -370,8 +372,8 @@ def wait_for_spark(master_dns, session_headers, port=8998):
         logging.info("Spark session status: {}".format(status))
         if status == 'dead':
             response_json = response.json()
-            raise Exception("Spark session is dead:\nResponse status code: {}\nHeaders: {}\nContent: {}" \
-                            .format(response.status_code, response.headers, response_json))
+            raise Exception("Spark session is dead\n  Response status code: {}\n  Headers: {}\n  Content: {}" \
+                            .format(response.status_code, pformat(response.headers), pformat(response_json)))
         elif status != 'idle':
             time.sleep(5)
 # ------------
@@ -437,12 +439,24 @@ def submit_spark_job_from_file(master_dns, session_headers, filepath, args={}, h
 # ------------
 
 
+def get_logstr_with_content(log_lines, content):
+    """ To get content with WARN:
+
+        get_log_with_content(log_lines, 'WARN')
+    """
+    important = ""
+    for line in log_lines:
+        if content in line:
+            important += (line) + "\n"
+    return important
+
 # Track Spark Job Status
 # ------------
-def track_spark_job(master_dns, job_response_headers, port=8998):
+def track_spark_job(master_dns, job_response_headers, port=8998, sleep_seconds=600):
     job_status = ''
     session_url = spark_url(master_dns, location=job_response_headers['Location'].split('/statements', 1)[0], port=port)
     statement_url = spark_url(master_dns, location=job_response_headers['Location'], port=port)
+    log_lines = ""
         
     while job_status not in ['available']:
         # If a statement takes longer than a few milliseconds to execute, Livy returns early and provides
@@ -452,6 +466,13 @@ def track_spark_job(master_dns, job_response_headers, port=8998):
         if isinstance(response_json, str):
             logging.info("response is a string:")
             logging.info(statement_response)
+        elif 'state' not in response_json:
+            logging.info("Response json does not contain `state` key. Response content:")
+            try:
+                del(response_json['code'])
+            except Exception as e:
+                pass
+            logging.info(pformat(response_json))
         else:
             job_status = response_json['state']
             del(response_json['code'])
@@ -462,21 +483,26 @@ def track_spark_job(master_dns, job_response_headers, port=8998):
                 logging.info('Progress: {}'.format(progress))
 
         logging.info("Response: {}".format(pformat(response_json)))
+        if statement_response.status_code == 400:
+            raise SystemError("Spark cluster is inactive")
+        else:
+            # Get the logs
+            log_lines = requests.get(session_url + '/log', 
+                                     headers={'Content-Type': 'application/json'}).json()['log']
+
+            logging.info("Log from the cluster:\n{}".format(get_logstr_with_content(log_lines, 'WARN')))
+            logging.info('Final job Status: ' + job_status)
+
 
         if job_status == 'idle':
             raise ValueError("track_spark_job error. Looks like you have passed spark session headers for the second parameter. "+
                              "Pass in spark job response headers instead.")
 
         if job_status != 'available':
-            time.sleep(5)
+            time.sleep(sleep_seconds)
             
     final_job_status = response_json['output']['status']
 
-    # Get the logs
-    log_lines = requests.get(session_url + '/log', 
-                             headers={'Content-Type': 'application/json'}).json()['log']
-    logging.info("Log from the cluster:\n{}".format("\n".join(log_lines)))
-    logging.info('Final job Status: ' + final_job_status)
 
     if final_job_status == 'error':
         logging.info('Statement exception: ' + statement_response.json()['output']['evalue'])
