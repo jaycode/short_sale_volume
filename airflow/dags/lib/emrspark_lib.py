@@ -275,7 +275,9 @@ def create_emr_cluster(emr_client, cluster_name, master_sg, slave_sg, keypair_na
                         { 'Name': 'hive' },
                         { 'Name': 'livy' },
                         { 'Name': 'zeppelin' }
-                    ]
+                    ],
+                    # To fix Invalid status code '400': "requirement failed: Session isn't active."
+                    Configurations=[{'classification': 'livy-conf','Properties': {'livy.server.session.timeout':'100h'}}]
                 )
                 ok = True
             except ClientError as e:
