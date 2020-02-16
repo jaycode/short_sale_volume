@@ -77,7 +77,7 @@ $ cat $AIRFLOW_HOME/airflow-webserver.pid | sudo xargs kill -9
 
 ### Where can I see the progress of the pulling process?
 
-Click on the DAG's name, then on either Graph View or Tree View, click on the currently running task, then click on "View Log". You will need to keep refreshing and view the bottom of the page to check on the progress. **The status is updated every 10 minutes.**
+Click on the DAG's name, then on either Graph View or Tree View, click on the currently running task, then click on "View Log". You will need to keep refreshing and view the bottom of the page to check on the progress. **The status is updated every 5 minutes.**
 
 Here is an example of outputs from the log for short interests:
 
