@@ -19,6 +19,7 @@ from lib.common import *
 def on_failure(context):
     Variable.set('short_interests_dag_state', 'ERROR')
 
+
 def on_complete():
     Variable.set('short_interests_dag_state', 'COMPLETED')
     if 's3a://' in config['App']['DB_HOST'] or 's3://' in config['App']['DB_HOST']:
@@ -29,8 +30,38 @@ def on_complete():
          .Session(region_name='us-east-1')
          .resource('s3')
          .Object(bucket, key)
+         .copy_from(CopySource={'Bucket': bucket,
+                                'Key': key},
+                    MetadataDirective="REPLACE",
+                    ContentType="text/csv")
+        )
+        (boto3
+         .session
+         .Session(region_name='us-east-1')
+         .resource('s3')
+         .Object(bucket, key)
          .Acl()
          .put(ACL='public-read'))
+
+        key = config['App']['TABLE_SHORT_ANALYSIS_QUANTOPIAN'][1:]+'.csv'
+        (boto3
+         .session
+         .Session(region_name='us-east-1')
+         .resource('s3')
+         .Object(bucket, key)
+         .copy_from(CopySource={'Bucket': bucket,
+                                'Key': key},
+                    MetadataDirective="REPLACE",
+                    ContentType="text/csv")
+        )
+        (boto3
+         .session
+         .Session(region_name='us-east-1')
+         .resource('s3')
+         .Object(bucket, key)
+         .Acl()
+         .put(ACL='public-read'))
+
 
 default_args = {
     'owner': 'jaycode',
