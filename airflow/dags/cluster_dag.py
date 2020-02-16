@@ -51,8 +51,6 @@ def preparation(**kwargs):
     Variable.delete('master_sg_id')
     Variable.delete('slave_sg_id')
     Variable.delete('short_interests_dag_state')
-    Variable.delete('prices_dag_state')
-    Variable.delete('combine_dag_state')
 
     ec2, emr, iam = emrs.get_boto_clients(config['AWS']['REGION_NAME'], config=config)
 
@@ -108,8 +106,6 @@ def cleanup(**kwargs):
     Variable.delete('master_sg_id')
     Variable.delete('slave_sg_id')
     Variable.delete('short_interests_dag_state')
-    Variable.delete('prices_dag_state')
-    Variable.delete('combine_dag_state')
 
 
 preparation_task = PythonOperator(
@@ -127,7 +123,7 @@ create_cluster_task = PythonOperator(
 check_etl_completion_task = VariableExistenceSensor(
     task_id='Check_etl_completion',
     poke_interval=120,
-    varnames=['combine_dag_state'],
+    varnames=['short_interests_dag_state'],
     mode='reschedule',
     dag=dag
 )

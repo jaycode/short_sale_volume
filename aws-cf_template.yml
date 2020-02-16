@@ -65,6 +65,10 @@ Parameters:
     AllowedValues:
       - m3.xlarge
       - c3.xlarge
+  BranchToPull:
+    Type: String
+    Default: quantopian-only
+    Description: Branch from https://github.com/jaycode/short_interest_effect to pull
 # Mapping to find the Amazon Linux AMI in each region.
 Mappings:
   RegionMap:
@@ -141,7 +145,7 @@ Resources:
          sudo yum install -y git
          # Download pipeline code
          cd /home/ec2-user
-         git clone -b aws-latest https://github.com/jaycode/short_interest_effect.git
+         git clone -b ${BranchToPull} https://github.com/jaycode/short_interest_effect.git
          cd /home/ec2-user/short_interest_effect
          sudo chmod -R 777 /home/ec2-user/short_interest_effect
          # Install boto3
