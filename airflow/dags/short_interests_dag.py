@@ -15,6 +15,7 @@ from airflow.utils import timezone
 yesterday = timezone.utcnow() - timedelta(days=2)
 
 from lib.common import *
+import boto3
 
 def on_failure(context):
     Variable.set('short_interests_dag_state', 'ERROR')
