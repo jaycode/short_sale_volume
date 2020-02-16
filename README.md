@@ -16,23 +16,23 @@ To demonstrate that the pipeline works, we only use a small subset of the data, 
 
 The pipeline consists of the following tasks:
 
-1. **Cluster DAG** creates Amazon EMR server, then it waits for the other DAGs to complete.
-2. If `STOCKS` configuration in `airflow/airflow.cfg` has not been filled with stock symbols, pull list of stock information from 
+1. **Cluster DAG** creates an Amazon EMR cluster, then waits for the other DAGs to complete.
+2. If `STOCKS` configuration in `airflow/airflow.cfg` has not been filled with stock symbols, pull the list of stock information from 
    old NASDAQ links for both NYSE and NASDAQ exchanges. The links as follows:
     - NASDAQ: https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=nasdaq&render=download
     - NYSE: https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=nyse&render=download
 3. Short Interest DAG, we will refer to this, and other non-cluster DAGs in the future, as **worker DAGs**: 
   - Pull short interest data from [Quandl's Financial Industry Regulatory Authority's short interest data](https://www.quandl.com/data/FINRA-Financial-Industry-Regulatory-Authority).
-  - Store the data in S3 server (or locally, depending on the setting in `config.cfg`).
+  - Store the data in the S3 server (or locally, depending on the setting in `config.cfg`).
   - Combine data from FINRA/NYSE and FINRA/NASDAQ exchanges (**Todo: There is also ORF exchange, but not sure where to get the list of stocks. Can anybody help?**)
 
-The pipeline is to be run once a day at 00:00. On the first run, it gets all data up to yesterday's date. In the following dates, we get one day of data for each day.
+The pipeline is to be run once a day at 00:00. On the first run, it gets all data up to yesterday's date. On the following dates, we get one day of data for each day.
 
 
-## How to setup and run
+## How to set up and run
 
-1. Create a key pair in AWS EC2 console.
-2. Create a CloudFormation stack from `basic_network.yml` template. This is a generic VPC configuration with 2 private and 2 public subnets which should be quite useful for other similar projects too. I recommend setting the stack name with something generic, like "BasicNetwork". Take note of the first VPC ID and SubnetID of the first public subnet.
+1. Create a key pair in the AWS EC2 console.
+2. Create a CloudFormation stack from the `basic_network.yml` template. This is a generic VPC configuration with 2 private and 2 public subnets which should be quite useful for other similar projects too. I recommend setting the stack name with something generic, like "BasicNetwork". Take note of the first VPC ID and SubnetID of the first public subnet.
 3. Create a CloudFormation stack from `aws-cf_template.yml`. Pass in your Quandl key and AWS Access ID and Private Access Key. I would name this stack with a specific project's name like "ShortInterests".
 4. After the stack created, go to the "Outputs" tab to get the URL of the Airflow admin, something like `http://ec2-3-219-234-248.compute-1.amazonaws.com:8080`. You can get the endpoint from there, which you can use to SSH connect.
     ```
@@ -40,7 +40,7 @@ The pipeline is to be run once a day at 00:00. On the first run, it gets all dat
     ssh -i "~/path/to/airflow_pem.pem" ec2-user@ec2-3-219-234-248.compute-1.amazonaws.com
     ```
 
-5. Connect via ssh to the server. Note that the Airflow admin may likely not to be ready just yet, because there may be some code that are still running on the EC2 server. To check on the progress, SSH connect to the EC2 instance, then run this command `cat /var/log/user-data.log` to see the entire log, or `tail /var/log/user-data.log` to view the last few lines.
+5. Connect via ssh to the server. Note that the Airflow admin may likely not be ready just yet, because there may be some code that is still running on the EC2 server. To check on the progress, SSH-connect to the EC2 instance, then run this command `cat /var/log/user-data.log` to see the entire log, or `tail /var/log/user-data.log` to view the last few lines.
 6. Once the Airflow webserver is ready (check the file `/var/log/user-data.log` a few times until there are no changes), run the following commands on the server to run Airflow Scheduler:
 
     ```
@@ -77,32 +77,23 @@ $ cat $AIRFLOW_HOME/airflow-webserver.pid | sudo xargs kill -9
 
 ### Can I keep the EMR cluster after use?
 
-By default, Cluster DAG turns off EMR cluster after use or if there is an error in the Short Interests DAG. If you want to keep it on, create a Variable named `keep_emr_cluster` from the `Admin > Variables` menu at the top. This is useful for debugging, as it saves time rather than recreating the cluster all the time. Don't forget to delete the variable to avoid unneeded server costs.
+By default, Cluster DAG turns off the EMR cluster after use or if there is an error in the Short Interests DAG. If you want to keep it on, create a Variable named `keep_emr_cluster` from the `Admin > Variables` menu at the top. This is useful for debugging, as it saves time rather than recreating the cluster all the time. Don't forget to delete the variable to avoid paying for unused cluster time.
 
 ### Where can I see the progress of the pulling process?
 
 Click on the DAG's name, then on either Graph View or Tree View, click on the currently running task, then click on "View Log". You will need to keep refreshing and view the bottom of the page to check on the progress. **The status is updated every 5 minutes.**
 
-Here is an example of outputs from the log for short interests:
-
-```
-20/02/04 16:27:59 WARN DAG: downloading from exchange FNSQ - 1801/3621 - total rows in this batch: 1814543
-20/02/04 16:49:11 WARN DAG: downloading from exchange FNSQ - 1901/3621 - total rows in this batch: 1937516
-20/02/04 17:10:13 WARN DAG: downloading from exchange FNSQ - 2001/3621 - total rows in this batch: 2046578
-```
-
-Notice that it took about 20 minutes to pull 110,000 - 120,000 data points.
-
-
 ### Can I resize the size of EMR? Will it affect the running speed?
 
-Yes and No.
+Yes, No.
 
-You may resize through the EMR cluster page, then click on Hardware. However, currently, changing it to anything above 3 nodes won't increase the speed of downloading short interest data. The bottleneck lies in the network connection between EMR cluster's master node and Quandle or QuoteMedia server.
+You may resize through the EMR cluster page, then click on Hardware. However, currently, changing it to anything above 3 nodes won't increase the speed of downloading short interest data. The bottleneck lies in the network connection between the EMR cluster's master node and Quandle or QuoteMedia server.
 
 **Todo: Parallelization of the requests to Quandl by using UDF (user-defined-function) to perform GET requests through slave nodes may improve the speed of this process. The initial version of the code is stored in `airflow/dags/etl/pull_short_interests-udf.py`. It does not currently have any sort of reporting to tell us the progress as we pull the data, and, more critically, it creates duplicates for existing data.**
 
-As a reference, with 3-10 EMR cluster's slave nodes, it takes between 20 to 40 minutes to load about 110,000 short interest data (100 companies on a fresh start between 2013-04-01 and 2020-02-04).
+### What happens when the process got stopped in the middle?
+
+The scheduler is smart enough not to re-process the data, so there is no worry here.
 
 ### How do I debug the Short Interests DAG?
 
@@ -113,7 +104,7 @@ If there is an error on any of the steps in the Short Interests DAG, the system 
   - By default, proceeds with turning off the EMR cluster (this is to avoid exorbitant charges from leaving it running).
   - If a Variable `keep_emr_cluster` exists, keep the EMR cluster.
 
-Therefore, the final state is a SUCCESS state for the Cluster DAG and the ERROR state for the Short Interests DAG. To re-run only the step that contains the erorr, perform the following procedure:
+Therefore, the final state is a SUCCESS state for the Cluster DAG and the ERROR state for the Short Interests DAG. To re-run only the step that contains the error, perform the following procedure:
 
 #### 1. Delete the Cluster DAG
 
@@ -154,7 +145,7 @@ Then click on the "Clear" button:
 Now we just need to wait for the Short Interests Dag to complete running.
 
 
-## Troubleshootings
+## Troubleshooting
 
 > botocore.exceptions.ClientError: An error occurred (ValidationException) when calling the RunJobFlow operation: Invalid InstanceProfile: EMR_EC2_DefaultRole.
 
@@ -166,11 +157,11 @@ It's likely `EMR_EC2_DefaultRole` instance profile is not ready yet when we crea
 The main problem is with pulling the data from the APIs. Each request takes about 3 seconds. To make this process faster, we can try adding more nodes in our EM3 cluster to deal with this situation.
 
 ### 2. What if we needed to run the pipeline on a daily basis by 7 am every day?
-Just need to update `schedule_interval` setting accordingly for all of the DAGs for this.
+Update `schedule_interval` setting accordingly for all of the DAGs for this.
 
 ### 3. What to do if the database needed to be accessed by 100+ people?
 The answer to this comes in two flavors:
-- If the users need to flexibly access the database to perform any SQL queries, we opt for Redshift cluster with auto-scaling capabilites.
+- If the users need to flexibly access the database to perform any SQL queries, we opt for a Redshift cluster with auto-scaling capabilities.
 - If the users would run basically a few sets of queries, use the combination of Apache Spark and Apache Cassandra to use the latter as a storage layer. [Here](https://opencredo.com/blogs/data-analytics-using-cassandra-and-spark/) is a link to a tutorial on this.
 
 
@@ -184,7 +175,7 @@ The answer to this comes in two flavors:
 ## Todos
 
 1. There are a couple of **Todo**s above. If you feel generous, post a pull request to improve them.
-2. The `aws-latest` branch is meant to gather pricing data from QuoteMedia then combine them with the short interests data from Quandl. However, the branch still currently has some bugs, and it does not make sense to combine the data for later slicing them off when preparing the data for use in Quantopian. When the need to analyze the data outside of Quantopian arises, work on this branch further.
+2. The `aws-latest` branch is meant to gather pricing data from QuoteMedia then combine them with the short interest data from Quandl. However, the branch still currently has some bugs, and it does not make sense to combine the data for later slicing them off when preparing the data for use in Quantopian. When the need to analyze the data outside of Quantopian arises, work on this branch further.
 3. The `local-only` branch is for the local version of Airflow. This was needed when the system was initially developed. I don't see how it is ever going to be needed again, but I keep this branch just in case someone may need it.
-4. Both the `aws-latest` and `local-only` branches are currently not fast enough for use with large datasets. Diff the `airflow/etl/short_interests.py` with `quantopian-only` branch and move the needed updates to the other branches. Also do similar updates to the `airflow/etl/pull_prices.py` file.
-5. Investigate whether paralellization of the GET requests would improve the ETL speed (see the "FAQs" section above).
+4. Both the `aws-latest` and `local-only` branches are currently not fast enough for use with large datasets. Diff the `airflow/etl/short_interests.py` with `quantopian-only` branch and move the needed updates to the other branches. Also, do similar updates to the `airflow/etl/pull_prices.py` file.
+5. Investigate whether parallelization of the GET requests would improve the ETL speed (see the "FAQs" section above).
