@@ -162,6 +162,48 @@ quality_check_task = PythonOperator(
     dag=dag
 )
 
+combine_datasets_task = PythonOperator(
+    task_id='Combine_datasets',
+    python_callable=submit_spark_job_from_file,
+    op_kwargs={
+        'commonpath': '{}/dags/etl/common.py'.format(airflow_dir),
+        'helperspath': '{}/dags/etl/helpers.py'.format(airflow_dir),
+        'filepath': '{}/dags/etl/combine.py'.format(airflow_dir), 
+        'args': {
+            'YESTERDAY_DATE': '{{ds}}',
+            'AWS_ACCESS_KEY_ID': config['AWS']['AWS_ACCESS_KEY_ID'],
+            'AWS_SECRET_ACCESS_KEY': config['AWS']['AWS_SECRET_ACCESS_KEY'],
+            'DB_HOST': config['App']['DB_HOST'],
+            'TABLE_SHORT_INTERESTS_NASDAQ': config['App']['TABLE_SHORT_INTERESTS_NASDAQ'],
+            'TABLE_SHORT_INTERESTS_NYSE': config['App']['TABLE_SHORT_INTERESTS_NYSE'],
+            'TABLE_SHORT_ANALYSIS': config['App']['TABLE_SHORT_ANALYSIS'],
+        }
+    },
+    dag=dag
+)
+
+prepare_for_quantopian_task = PythonOperator(
+    task_id='Prepare_for_Quantopian',
+    python_callable=submit_spark_job_from_file,
+    op_kwargs={
+        'commonpath': '{}/dags/etl/common.py'.format(airflow_dir),
+        'helperspath': '{}/dags/etl/helpers.py'.format(airflow_dir),
+        'filepath': '{}/dags/etl/prepare_for_quantopian.py'.format(airflow_dir), 
+        'args': {
+            'AWS_ACCESS_KEY_ID': config['AWS']['AWS_ACCESS_KEY_ID'],
+            'AWS_SECRET_ACCESS_KEY': config['AWS']['AWS_SECRET_ACCESS_KEY'],
+            'YESTERDAY_DATE': '{{ds}}',
+            'STOCKS': STOCKS,
+            'DB_HOST': config['App']['DB_HOST'],
+            'TABLE_STOCK_INFO_NASDAQ': config['App']['TABLE_STOCK_INFO_NASDAQ'],
+            'TABLE_STOCK_INFO_NYSE': config['App']['TABLE_STOCK_INFO_NYSE'],
+            'TABLE_SHORT_INTERESTS_NASDAQ': config['App']['TABLE_SHORT_INTERESTS_NASDAQ'],
+            'TABLE_SHORT_INTERESTS_NYSE': config['App']['TABLE_SHORT_INTERESTS_NYSE'],
+        },
+        'on_complete': lambda *args: Variable.set('short_interests_dag_state', 'COMPLETED')
+    }
+)
 
 wait_for_fresh_run_task >> wait_for_cluster_task >> \
-pull_stock_symbols_task >> pull_short_interest_data_task >> quality_check_task
+pull_stock_symbols_task >> pull_short_interest_data_task >> \
+quality_check_task >> combine_datasets_task >> prepare_for_quantopian_task

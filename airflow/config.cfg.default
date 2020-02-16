@@ -14,7 +14,6 @@ TABLE_STOCK_INFO_NASDAQ=/data/raw/stock_info_nasdaq
 TABLE_STOCK_INFO_NYSE=/data/raw/stock_info_nyse
 TABLE_SHORT_INTERESTS_NASDAQ=/data/raw/short_interests_nasdaq
 TABLE_SHORT_INTERESTS_NYSE=/data/raw/short_interests_nyse
-TABLE_STOCK_PRICES=/data/raw/prices
 TABLE_SHORT_ANALYSIS=/data/processed/short_analysis
 TABLE_SHORT_ANALYSIS_QUANTOPIAN=/data/processed/short_analysis-q
 

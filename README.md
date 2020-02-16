@@ -1,6 +1,6 @@
-# Effect of Short Interest to Stock Pricing
+# Effect of Short Interest to Stock Pricing - for Quantopian Self-Serve Data
 
-Effect of short interest to stock pricing. Uses data from Quandl + QuoteMedia.
+Download short interests from Quandl, then process it to be uploaded to Quantopian Self-Serve Data.
 
 ## Overview
 
@@ -21,10 +21,10 @@ The pipeline consists of the following tasks:
    old NASDAQ links for both NYSE and NASDAQ exchanges. The links as follows:
     - NASDAQ: https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=nasdaq&render=download
     - NYSE: https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=nyse&render=download
-3. Short Interest DAG: Pull short interest data from [Quandl's Financial Industry Regulatory Authority's short interest data](https://www.quandl.com/data/FINRA-Financial-Industry-Regulatory-Authority). Store the data in S3 server (or locally, depending on the setting in `config.cfg`).
-4. Prices DAG: Pull pricing data from QuoteMedia, store as CSV.
-5. Combine DAG: Combine the short interests and stock price data.
-6. Once the data are combined, Cluster DAG continues to terminate the EMR cluster.
+3. Short Interest DAG: 
+  - Pull short interest data from [Quandl's Financial Industry Regulatory Authority's short interest data](https://www.quandl.com/data/FINRA-Financial-Industry-Regulatory-Authority).
+  - Store the data in S3 server (or locally, depending on the setting in `config.cfg`).
+  - Combine data from FINRA/NYSE and FINRA/NASDAQ exchanges (**Todo: There is also ORF exchange, but not sure where to get the list of stocks. Can anybody help?**)
 
 The pipeline is to be run once a day at 00:00. On the first run, it gets all data up to yesterday's date. In the following dates, we get one day of data for each day.
 
@@ -92,7 +92,9 @@ Notice that it took about 20 minutes to pull 110,000 - 120,000 data points.
 
 ### Can I resize the size of EMR? Will it affect the running speed?
 
-Yes, you may do it through the EMR cluster page, then click on Hardware. However, currently, changing it to anything above 3 nodes won't increase the speed of downloading short interest data. The bottleneck lies in the network connection between EMR cluster's master node and Quandle or QuoteMedia server.
+Yes and No.
+
+You may resize through the EMR cluster page, then click on Hardware. However, currently, changing it to anything above 3 nodes won't increase the speed of downloading short interest data. The bottleneck lies in the network connection between EMR cluster's master node and Quandle or QuoteMedia server.
 
 **Todo: Parallelize the requests to Quandl by using UDF (user-defined-function) to perform GET requests through slave nodes. The initial version of the code is stored in `airflow/dags/etl/pull_short_interests-udf.py`. It does not currently have any sort of reporting to tell us the progress as we pull the data, and, more critically, it creates duplicates for existing data.**
 
@@ -125,3 +127,8 @@ The answer to this comes in two flavors:
 - Apache Airflow: Scheduler application. Another interesting alternative for this is AWS Step Functions, but for
   this project Apache Airflow is preferable as it is way easier to setup.
 - Apache Spark: Good for working with huge datasets.
+
+## Help Needed
+
+1. There are a couple of **Todo**s above. If you feel generous, post a pull request to improve them.
+2. I am seeking a position in quantitative finance. Let me know if you personally know of any organization that may be interested in hiring.
