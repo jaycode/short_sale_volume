@@ -92,8 +92,10 @@ def create_cluster(**kwargs):
 
 
 def terminate_cluster(**kwargs):
-    ec2, emr, iam = emrs.get_boto_clients(config['AWS']['REGION_NAME'], config=config)
-    emrs.delete_cluster(emr, Variable.get('cluster_id'))
+    keep_cluster = Variable.get('keep_emr_cluster', default_var=False)
+    if not keep_cluster:
+        ec2, emr, iam = emrs.get_boto_clients(config['AWS']['REGION_NAME'], config=config)
+        emrs.delete_cluster(emr, Variable.get('cluster_id'))
 
 
 def cleanup(**kwargs):
