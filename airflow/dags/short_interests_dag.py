@@ -16,6 +16,9 @@ yesterday = timezone.utcnow() - timedelta(days=2)
 
 from lib.common import *
 
+def on_failure(context):
+    Variable.set('short_interests_dag_state', 'ERROR')
+
 default_args = {
     'owner': 'jaycode',
     'start_date': yesterday,
@@ -26,7 +29,9 @@ default_args = {
     # Catch up is True because we want the operations to be atomic i.e. if I
     # skipped running the DAGs for a few days I'd want this system to run
     # for all these missing dates.
-    'catchup':True
+    'catchup':True,
+
+    'on_failure_callback': on_failure
 }
 
 dag = DAG('short_interests_dag',
