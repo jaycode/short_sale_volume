@@ -195,13 +195,12 @@ prepare_for_quantopian_task = PythonOperator(
             'YESTERDAY_DATE': '{{ds}}',
             'STOCKS': STOCKS,
             'DB_HOST': config['App']['DB_HOST'],
-            'TABLE_STOCK_INFO_NASDAQ': config['App']['TABLE_STOCK_INFO_NASDAQ'],
-            'TABLE_STOCK_INFO_NYSE': config['App']['TABLE_STOCK_INFO_NYSE'],
-            'TABLE_SHORT_INTERESTS_NASDAQ': config['App']['TABLE_SHORT_INTERESTS_NASDAQ'],
-            'TABLE_SHORT_INTERESTS_NYSE': config['App']['TABLE_SHORT_INTERESTS_NYSE'],
+            'TABLE_SHORT_ANALYSIS': config['App']['TABLE_SHORT_ANALYSIS'],
+            'TABLE_SHORT_ANALYSIS_QUANTOPIAN': config['App']['TABLE_SHORT_ANALYSIS_QUANTOPIAN'],
         },
         'on_complete': lambda *args: Variable.set('short_interests_dag_state', 'COMPLETED')
-    }
+    },
+    dag=dag
 )
 
 wait_for_fresh_run_task >> wait_for_cluster_task >> \
