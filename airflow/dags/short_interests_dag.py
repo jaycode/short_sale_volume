@@ -16,6 +16,22 @@ yesterday = timezone.utcnow() - timedelta(days=2)
 
 from lib.common import *
 
+def on_failure(context):
+    Variable.set('short_interests_dag_state', 'ERROR')
+
+def on_complete(context):
+    Variable.set('short_interests_dag_state', 'COMPLETED')
+    if 's3a://' in config['App']['DB_HOST'] or 's3://' in config['App']['DB_HOST']:
+        bucket = config['App']['DB_HOST'].split('/')[-1]
+        key = config['App']['TABLE_SHORT_ANALYSIS'][1:]+'.csv'
+        (boto3
+         .session
+         .Session(region_name='us-east-1')
+         .resource('s3')
+         .Object(bucket, key)
+         .Acl()
+         .put(ACL='public-read'))
+
 default_args = {
     'owner': 'jaycode',
     'start_date': yesterday,
@@ -26,7 +42,9 @@ default_args = {
     # Catch up is True because we want the operations to be atomic i.e. if I
     # skipped running the DAGs for a few days I'd want this system to run
     # for all these missing dates.
-    'catchup':True
+    'catchup':True,
+
+    'on_failure_callback': on_failure
 }
 
 dag = DAG('short_interests_dag',
@@ -70,6 +88,7 @@ def submit_spark_job_from_file(**kwargs):
         logging.info(line)
         if '(FAIL)' in str(line):
             logging.error(line)
+            Variable.set('short_interests_dag_state', 'ERROR')
             raise AirflowException("ETL process fails.")
 
     if final_status in ['available', 'ok'] and 'on_complete' in kwargs:
@@ -157,8 +176,7 @@ quality_check_task = PythonOperator(
             'TABLE_STOCK_INFO_NYSE': config['App']['TABLE_STOCK_INFO_NYSE'],
             'TABLE_SHORT_INTERESTS_NASDAQ': config['App']['TABLE_SHORT_INTERESTS_NASDAQ'],
             'TABLE_SHORT_INTERESTS_NYSE': config['App']['TABLE_SHORT_INTERESTS_NYSE'],
-        },
-        'on_complete': lambda *args: Variable.set('short_interests_dag_state', 'COMPLETED')
+        }
     },
     dag=dag
 )
@@ -199,7 +217,7 @@ prepare_for_quantopian_task = PythonOperator(
             'TABLE_SHORT_ANALYSIS': config['App']['TABLE_SHORT_ANALYSIS'],
             'TABLE_SHORT_ANALYSIS_QUANTOPIAN': config['App']['TABLE_SHORT_ANALYSIS_QUANTOPIAN'],
         },
-        'on_complete': lambda *args: Variable.set('short_interests_dag_state', 'COMPLETED')
+        'on_complete': on_complete
     },
     dag=dag
 )

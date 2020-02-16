@@ -16,12 +16,12 @@ To demonstrate that the pipeline works, we only use a small subset of the data, 
 
 The pipeline consists of the following tasks:
 
-1. Cluster DAG creates Amazon EMR server, then it waits for the other DAGs to complete.
+1. **Cluster DAG** creates Amazon EMR server, then it waits for the other DAGs to complete.
 2. If `STOCKS` configuration in `airflow/airflow.cfg` has not been filled with stock symbols, pull list of stock information from 
    old NASDAQ links for both NYSE and NASDAQ exchanges. The links as follows:
     - NASDAQ: https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=nasdaq&render=download
     - NYSE: https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=nyse&render=download
-3. Short Interest DAG: 
+3. Short Interest DAG, we will refer to this, and other non-cluster DAGs in the future, as **worker DAGs**: 
   - Pull short interest data from [Quandl's Financial Industry Regulatory Authority's short interest data](https://www.quandl.com/data/FINRA-Financial-Industry-Regulatory-Authority).
   - Store the data in S3 server (or locally, depending on the setting in `config.cfg`).
   - Combine data from FINRA/NYSE and FINRA/NASDAQ exchanges (**Todo: There is also ORF exchange, but not sure where to get the list of stocks. Can anybody help?**)
@@ -96,9 +96,56 @@ Yes and No.
 
 You may resize through the EMR cluster page, then click on Hardware. However, currently, changing it to anything above 3 nodes won't increase the speed of downloading short interest data. The bottleneck lies in the network connection between EMR cluster's master node and Quandle or QuoteMedia server.
 
-**Todo: Parallelize the requests to Quandl by using UDF (user-defined-function) to perform GET requests through slave nodes. The initial version of the code is stored in `airflow/dags/etl/pull_short_interests-udf.py`. It does not currently have any sort of reporting to tell us the progress as we pull the data, and, more critically, it creates duplicates for existing data.**
+**Todo: Parallelization of the requests to Quandl by using UDF (user-defined-function) to perform GET requests through slave nodes may improve the speed of this process. The initial version of the code is stored in `airflow/dags/etl/pull_short_interests-udf.py`. It does not currently have any sort of reporting to tell us the progress as we pull the data, and, more critically, it creates duplicates for existing data.**
 
 As a reference, with 3-10 EMR cluster's slave nodes, it takes between 20 to 40 minutes to load about 110,000 short interest data (100 companies on a fresh start between 2013-04-01 and 2020-02-04).
+
+### How do I debug the Short Interests DAG?
+
+If there is an error on any of the steps in the Short Interests DAG, the system will do the following:
+
+1. The DAG will stop running. Set the state of this worker DAG into ERROR.
+2. The Cluster DAG will detect the state, then proceeds with turning off the EMR cluster (this is to avoid exorbitant charges from leaving it running).
+
+Therefore, the final state is a SUCCESS state for the Cluster DAG and the ERROR state for the Short Interests DAG. To re-run only the step that contains the erorr, perform the following procedure:
+
+#### 1. Delete the Cluster DAG
+
+Click on the delete button on the right part of the Cluster DAG:
+
+![error-1](media/error-1.png)
+
+#### 2. Refresh the page, and then toggle ON the Cluster DAG
+
+Click on this OFF switch to turn it on:
+
+![error-2](media/error-2.png)
+
+By doing so, the Cluster DAG will restart the EMR cluster and wait for the Short Interests DAG to complete (or returns another error).
+
+#### 3. Wait until the Cluster DAG is in *waiting* state
+
+The *waiting* state should look like so:
+
+![error-3](media/error-3.png)
+
+Take note of the colors and positions of the circles.
+
+#### 4. Clear the task that contains the error
+
+Click on the `short_interests_dag` link to open up its details, then click on "Tree View". Within it, click the red box (the task that contains the error):
+
+![error-4](media/error-4.png)
+
+Then click on the "Clear" button:
+
+![error-5](media/error-5.png)
+
+#### 5. ????
+
+#### 6. Profit
+
+Now we just need to wait for the Short Interests Dag to complete running.
 
 
 ## Troubleshootings
@@ -128,7 +175,10 @@ The answer to this comes in two flavors:
   this project Apache Airflow is preferable as it is way easier to setup.
 - Apache Spark: Good for working with huge datasets.
 
-## Help Needed
+## Todos
 
 1. There are a couple of **Todo**s above. If you feel generous, post a pull request to improve them.
-2. I am seeking a position in quantitative finance. Let me know if you personally know of any organization that may be interested in hiring.
+2. The `aws-latest` branch is meant to gather pricing data from QuoteMedia then combine them with the short interests data from Quandl. However, the branch still currently has some bugs, and it does not make sense to combine the data for later slicing them off when preparing the data for use in Quantopian. When the need to analyze the data outside of Quantopian arises, work on this branch further.
+3. The `local-only` branch is for the local version of Airflow. This was needed when the system was initially developed. I don't see how it is ever going to be needed again, but I keep this branch just in case someone may need it.
+4. Both the `aws-latest` and `local-only` branches are currently not fast enough for use with large datasets. Diff the `airflow/etl/short_interests.py` with `quantopian-only` branch and move the needed updates to the other branches. Also do similar updates to the `airflow/etl/pull_prices.py` file.
+5. Investigate whether paralellization of the GET requests would improve the ETL speed (see the "FAQs" section above).
