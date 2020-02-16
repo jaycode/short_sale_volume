@@ -70,6 +70,7 @@ def submit_spark_job_from_file(**kwargs):
         logging.info(line)
         if '(FAIL)' in str(line):
             logging.error(line)
+            Variable.set('short_interests_dag_state', 'ERROR')
             raise AirflowException("ETL process fails.")
 
     if final_status in ['available', 'ok'] and 'on_complete' in kwargs:
@@ -157,8 +158,7 @@ quality_check_task = PythonOperator(
             'TABLE_STOCK_INFO_NYSE': config['App']['TABLE_STOCK_INFO_NYSE'],
             'TABLE_SHORT_INTERESTS_NASDAQ': config['App']['TABLE_SHORT_INTERESTS_NASDAQ'],
             'TABLE_SHORT_INTERESTS_NYSE': config['App']['TABLE_SHORT_INTERESTS_NYSE'],
-        },
-        'on_complete': lambda *args: Variable.set('short_interests_dag_state', 'COMPLETED')
+        }
     },
     dag=dag
 )
