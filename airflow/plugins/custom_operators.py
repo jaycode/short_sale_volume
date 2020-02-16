@@ -19,7 +19,7 @@ class VariableExistenceSensor(BaseSensorOperator):
             bool_true = False
             bool_false = True
 
-        if operation == 'AND':
+        if self.operation == 'AND':
             status = True
             for varname in self.varnames:
                 var = Variable.get(varname, default_var=None)
@@ -27,7 +27,7 @@ class VariableExistenceSensor(BaseSensorOperator):
                     status = status and bool_true
                 else:
                     status = status and bool_false
-        elif operation == 'OR':
+        elif self.operation == 'OR':
             status = False
             for varname in self.varnames:
                 var = Variable.get(varname, default_var=None)
