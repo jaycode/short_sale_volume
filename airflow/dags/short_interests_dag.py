@@ -19,6 +19,19 @@ from lib.common import *
 def on_failure(context):
     Variable.set('short_interests_dag_state', 'ERROR')
 
+def on_complete(context):
+    Variable.set('short_interests_dag_state', 'COMPLETED')
+    if 's3a://' in config['App']['DB_HOST'] or 's3://' in config['App']['DB_HOST']:
+        bucket = config['App']['DB_HOST'].split('/')[-1]
+        key = config['App']['TABLE_SHORT_ANALYSIS'][1:]+'.csv'
+        (boto3
+         .session
+         .Session(region_name='us-east-1')
+         .resource('s3')
+         .Object(bucket, key)
+         .Acl()
+         .put(ACL='public-read'))
+
 default_args = {
     'owner': 'jaycode',
     'start_date': yesterday,
@@ -204,7 +217,7 @@ prepare_for_quantopian_task = PythonOperator(
             'TABLE_SHORT_ANALYSIS': config['App']['TABLE_SHORT_ANALYSIS'],
             'TABLE_SHORT_ANALYSIS_QUANTOPIAN': config['App']['TABLE_SHORT_ANALYSIS_QUANTOPIAN'],
         },
-        'on_complete': lambda *args: Variable.set('short_interests_dag_state', 'COMPLETED')
+        'on_complete': on_complete
     },
     dag=dag
 )
