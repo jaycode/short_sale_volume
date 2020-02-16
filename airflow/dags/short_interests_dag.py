@@ -12,13 +12,12 @@ from airflow.configuration import conf as airflow_config
 import logging
 
 from airflow.utils import timezone
-yesterday = timezone.utcnow() - timedelta(days=2)
 
 from lib.common import *
 
 default_args = {
     'owner': 'jaycode',
-    'start_date': yesterday,
+    'start_date': timezone.utcnow(),
     'depends_on_past': True,
     'retries': 0,
     'email_on_retry': False,
@@ -49,7 +48,7 @@ def submit_spark_job_from_file(**kwargs):
         raise AirflowException("Error in prices_dag. Redo all DAGs.")
 
     cluster_dns = emrs.get_cluster_dns(emr, Variable.get('cluster_id'))
-    emrs.kill_all_inactive_spark_sessions(cluster_dns)
+    emrs.kill_all_spark_sessions(cluster_dns)
     session_headers = emrs.create_spark_session(cluster_dns)
     helperspath = None
     if 'helperspath' in kwargs:
@@ -125,7 +124,7 @@ pull_short_interest_data_task = PythonOperator(
         'args': {
             'START_DATE': config['App']['START_DATE'],
             'QUANDL_API_KEY': config['Quandl']['API_KEY'],
-            'YESTERDAY_DATE': '{{yesterday_ds}}',
+            'YESTERDAY_DATE': '{{ds}}',
             'LIMIT': LIMIT,
             'STOCKS': STOCKS,
             'AWS_ACCESS_KEY_ID': config['AWS']['AWS_ACCESS_KEY_ID'],
@@ -150,7 +149,7 @@ quality_check_task = PythonOperator(
         'args': {
             'AWS_ACCESS_KEY_ID': config['AWS']['AWS_ACCESS_KEY_ID'],
             'AWS_SECRET_ACCESS_KEY': config['AWS']['AWS_SECRET_ACCESS_KEY'],
-            'YESTERDAY_DATE': '{{yesterday_ds}}',
+            'YESTERDAY_DATE': '{{ds}}',
             'STOCKS': STOCKS,
             'DB_HOST': config['App']['DB_HOST'],
             'TABLE_STOCK_INFO_NASDAQ': config['App']['TABLE_STOCK_INFO_NASDAQ'],

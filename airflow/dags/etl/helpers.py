@@ -96,13 +96,17 @@ def check_basic_quality(logger, host, table_path, table_type='csv'):
     """
     if not spark_table_exists(host, table_path):
         logger.warn("(FAIL) Table {} does not exist".format(host+table_path))
+        return None
     else:
         if table_type == 'parquet':
-            count = spark.read.parquet(host+table_path).count()
+            sdf = spark.read.parquet(host+table_path)
+            count = sdf.rdd.countApprox(timeout=1000, confidence=0.9)
         elif table_type == 'csv':
-            count = spark.read.csv(host+table_path, header=True).count()
+            sdf = spark.read.csv(host+table_path, header=True)
+            count = sdf.rdd.countApprox(timeout=1000, confidence=0.9)
             
         if count == 0:
             logger.warn("(FAIL) Table {} is empty.".format(host+table_path))
         else:
             logger.warn("(SUCCESS) Table {} has {} rows.".format(host+table_path, count))
+        return sdf

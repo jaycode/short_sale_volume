@@ -53,31 +53,40 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
     symbols = df.select('Symbol').rdd.map(lambda r: r['Symbol']).collect()
     
     table_exists = spark_table_exists(host, short_interests_table_path)
+    last_dates = None
     if table_exists:
         short_sdf = spark.read.csv(host+short_interests_table_path, header=True)
+        last_dates = short_sdf.groupBy('Symbol').agg(F.max('Date').alias('last_date')).collect()
         
     total_rows = 0
     for i, symbol in enumerate(symbols):
+        data = []
         if table_exists:
             # Get the last date of a stock. If this last date >= YESTERDAY_DATE, don't do anything.
-            dates = short_sdf.select('Date').where(short_sdf.Symbol == F.lit(symbol)) \
-                .orderBy(F.desc('Date')).take(1)
-            if len(dates) > 0:
-                if a_before_b(dates[0].Date, YESTERDAY_DATE):
-                    data = pull_exchange_short_interests_by_symbol(symbol, dates[0].Date, YESTERDAY_DATE)
-                else:
-                    data = []
+            if last_dates != None:
+                dates = last_dates[symbol]['last_date']
+                if len(dates) != 0:
+                    date = dates[0]
+                    logger.warn("last date for {} is {}".format(symbol, date))
+                    if a_before_b(date, YESTERDAY_DATE):
+                        logger.warn("last date is > yesterday date, so we pull data from {} to {}".format(date, YESTERDAY_DATE))
+                        data = pull_exchange_short_interests_by_symbol(symbol, date, YESTERDAY_DATE)
             else:
+                logger.warn("pull data from all dates")
                 data = pull_exchange_short_interests_by_symbol(symbol, START_DATE, YESTERDAY_DATE)
         else:
             data = pull_exchange_short_interests_by_symbol(symbol, START_DATE, YESTERDAY_DATE)
+            # If running for the first time, create the DataFrame:
+            if total_rows == 0 and len(data) > 0:
+                short_sdf = spark.createDataFrame(data)
+
         total_rows += len(data)
         if (i%log_every_n == 0 or (i+1) == len(symbols)):
             logger.warn("downloading from exchange {} - {}/{} - total rows in this batch: {}".format(exchange, i+1, len(symbols), total_rows))
         
         if len(data) > 0:
-            short_sdf = spark.createDataFrame(data)
-            short_sdf.write.mode('append').format('csv').save(host+short_interests_table_path, header=True)
+            # short_sdf.write.mode('append').format('csv').save(host+short_interests_table_path, header=True)
+            pass
     logger.warn("done!")
 
 pull_short_interests('FNSQ', DB_HOST, TABLE_STOCK_INFO_NASDAQ, TABLE_SHORT_INTERESTS_NASDAQ)
