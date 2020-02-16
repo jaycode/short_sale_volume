@@ -19,7 +19,7 @@ from lib.common import *
 def on_failure(context):
     Variable.set('short_interests_dag_state', 'ERROR')
 
-def on_complete(context):
+def on_complete():
     Variable.set('short_interests_dag_state', 'COMPLETED')
     if 's3a://' in config['App']['DB_HOST'] or 's3://' in config['App']['DB_HOST']:
         bucket = config['App']['DB_HOST'].split('/')[-1]
