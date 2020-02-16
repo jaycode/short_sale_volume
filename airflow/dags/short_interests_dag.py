@@ -64,7 +64,7 @@ def submit_spark_job_from_file(**kwargs):
         commonpath=commonpath,
         helperspath=helperspath)
 
-    final_status, logs = emrs.track_spark_job(cluster_dns, job_response_headers)
+    final_status, logs = emrs.track_spark_job(cluster_dns, job_response_headers, sleep_seconds=20)
     emrs.kill_spark_session(cluster_dns, session_headers)
     for line in logs:
         logging.info(line)
