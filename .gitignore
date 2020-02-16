@@ -6,3 +6,10 @@ airflow/*.cfg
 test_data/*
 default.yml
 *.pyc
+airflow/airflow-scheduler.err
+airflow/airflow-scheduler.log
+airflow/airflow-scheduler.out
+airflow/airflow-scheduler.pid
+airflow/airflow-webserver.err
+airflow/airflow-webserver.log
+airflow/airflow-webserver.out

@@ -12,6 +12,14 @@ def a_before_b(a, b):
     else:
         return False
     
+
+def rowlist2dict(rowlist):
+    obj = {}
+    for row in rowlist:
+        obj[row['Symbol']] = row['last_date']
+    return obj
+
+
 def convert_data(olddata, symbol, url):
     col_names = olddata['dataset']['column_names']
     col_names.append('Symbol')
@@ -57,6 +65,7 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
     if table_exists:
         short_sdf = spark.read.csv(host+short_interests_table_path, header=True)
         last_dates = short_sdf.groupBy('Symbol').agg(F.max('Date').alias('last_date')).collect()
+        last_dates = rowlist2dict(last_dates)
         
     total_rows = 0
     for i, symbol in enumerate(symbols):
@@ -64,11 +73,11 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
         if table_exists:
             # Get the last date of a stock. If this last date >= YESTERDAY_DATE, don't do anything.
             if last_dates != None:
-                dates = last_dates[symbol]['last_date']
-                if len(dates) != 0:
-                    date = dates[0]
-                    logger.warn("last date for {} is {}".format(symbol, date))
+                if symbol in last_dates:
+                    date = last_dates[symbol]
+                    # logger.warn("last date for {} is {}".format(symbol, date))
                     if a_before_b(date, YESTERDAY_DATE):
+                        logger.warn('6')
                         logger.warn("last date is > yesterday date, so we pull data from {} to {}".format(date, YESTERDAY_DATE))
                         data = pull_exchange_short_interests_by_symbol(symbol, date, YESTERDAY_DATE)
             else:

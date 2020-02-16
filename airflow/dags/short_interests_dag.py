@@ -12,12 +12,13 @@ from airflow.configuration import conf as airflow_config
 import logging
 
 from airflow.utils import timezone
+yesterday = timezone.utcnow() - timedelta(days=2)
 
 from lib.common import *
 
 default_args = {
     'owner': 'jaycode',
-    'start_date': timezone.utcnow(),
+    'start_date': yesterday,
     'depends_on_past': True,
     'retries': 0,
     'email_on_retry': False,
@@ -63,7 +64,7 @@ def submit_spark_job_from_file(**kwargs):
         commonpath=commonpath,
         helperspath=helperspath)
 
-    final_status, logs = emrs.track_spark_job(cluster_dns, job_response_headers)
+    final_status, logs = emrs.track_spark_job(cluster_dns, job_response_headers, sleep_seconds=300)
     emrs.kill_spark_session(cluster_dns, session_headers)
     for line in logs:
         logging.info(line)
@@ -195,13 +196,12 @@ prepare_for_quantopian_task = PythonOperator(
             'YESTERDAY_DATE': '{{ds}}',
             'STOCKS': STOCKS,
             'DB_HOST': config['App']['DB_HOST'],
-            'TABLE_STOCK_INFO_NASDAQ': config['App']['TABLE_STOCK_INFO_NASDAQ'],
-            'TABLE_STOCK_INFO_NYSE': config['App']['TABLE_STOCK_INFO_NYSE'],
-            'TABLE_SHORT_INTERESTS_NASDAQ': config['App']['TABLE_SHORT_INTERESTS_NASDAQ'],
-            'TABLE_SHORT_INTERESTS_NYSE': config['App']['TABLE_SHORT_INTERESTS_NYSE'],
+            'TABLE_SHORT_ANALYSIS': config['App']['TABLE_SHORT_ANALYSIS'],
+            'TABLE_SHORT_ANALYSIS_QUANTOPIAN': config['App']['TABLE_SHORT_ANALYSIS_QUANTOPIAN'],
         },
         'on_complete': lambda *args: Variable.set('short_interests_dag_state', 'COMPLETED')
-    }
+    },
+    dag=dag
 )
 
 wait_for_fresh_run_task >> wait_for_cluster_task >> \
