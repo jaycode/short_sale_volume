@@ -17,13 +17,12 @@ import logging
 import os
 
 from airflow.utils import timezone
-yesterday = timezone.utcnow() - timedelta(days=2)
 
 from lib.common import *
 
 default_args = {
     'owner': 'jaycode',
-    'start_date': yesterday,
+    'start_date': timezone.utcnow(),
     'depends_on_past': True,
     'retries': 0,
     'email_on_retry': False,

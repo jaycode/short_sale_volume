@@ -7,8 +7,23 @@ YST_DAY = YESTERDAY_DATE.split('-')[2]
 # In QuoteMedia, months start from 0, so we adjust this variable.
 YST_MONTH = int(YESTERDAY_DATE.split('-')[1]) - 1
 YST_YEAR = YESTERDAY_DATE.split('-')[0]
+    
 
 create_table = not(spark_table_exists(DB_HOST, TABLE_STOCK_PRICES))
+
+
+if create_table == True:
+    # If table does not exist, pull all data.
+    url = URL.format(sd=START_DAY, sm=START_MONTH, sy=START_YEAR,
+                     ed=YST_DAY, em=YST_MONTH, ey=YST_YEAR,
+                     sym='SPY')
+else:
+    # If table had existed, pull yesterday's data.
+    url = URL.format(sd=YST_DAY, sm=YST_MONTH, sy=YST_YEAR,
+                     ed=YST_DAY, em=YST_MONTH, ey=YST_YEAR,
+                     sym='SPY')
+logger.warn("URL to pull from: {}".format(url))
+
 def pull_prices_by_symbol(symbol):
     """
     Return:
@@ -25,11 +40,6 @@ def pull_prices_by_symbol(symbol):
                          ed=YST_DAY, em=YST_MONTH, ey=YST_YEAR,
                          sym=symbol)
         
-    # Code for always overwrite without temp table
-#     url = URL.format(sd=START_DAY, sm=START_MONTH, sy=START_YEAR,
-#                      ed=YST_DAY, em=YST_MONTH, ey=YST_YEAR,
-#                      sym=symbol)
-
     response = requests.get(url)
     newdata = ""
     if response.status_code in [200, 201]:
@@ -82,7 +92,8 @@ if create_table:
 else:
     logger.warn("    done! Now appending to table {}".format(table_name))
 
-spark.read.csv(tempdir, header=True, ignoreLeadingWhiteSpace=True, inferSchema=True) \
+p_sdf = spark.read.csv(tempdir, header=True, ignoreLeadingWhiteSpace=True, inferSchema=True) \
+p_sdf.select('*').where(p_sdf.date != 'date') \
 .write.mode(mode).csv(table_name, header=True)
 # .write.mode(mode).parquet(DB_HOST+TABLE_STOCK_PRICES)
 

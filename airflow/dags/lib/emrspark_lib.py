@@ -339,6 +339,16 @@ def kill_all_inactive_spark_sessions(master_dns):
             kill_spark_session_by_id(master_dns, spark_session['id'])
             logging.info("Killed {} spark session id {}".format(spark_session['state'],
                                                                 spark_session['id']))
+
+
+def kill_all_spark_sessions(master_dns):
+    response = requests.get(spark_url(master_dns, location='/sessions'))
+    spark_sessions = response.json()['sessions']
+    logging.info("Killing all spark sessions")
+    for spark_session in spark_sessions:
+        kill_spark_session_by_id(master_dns, spark_session['id'])
+        logging.info("Killed {} spark session id {}".format(spark_session['state'],
+                                                            spark_session['id']))
     
     
 def create_spark_session(master_dns, port=8998):
