@@ -49,7 +49,6 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
             newdata = convert_data(response.json(), symbol, url)
         return newdata
 
-    logger.warn('1')
     # Prepare list of stocks
     if STOCKS is not None and len(STOCKS) > 0:
         rdd1 = spark.sparkContext.parallelize(STOCKS)
@@ -61,7 +60,6 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
             df = df.limit(LIMIT)
     symbols = df.select('Symbol').rdd.map(lambda r: r['Symbol']).collect()
     
-    logger.warn('2')
     table_exists = spark_table_exists(host, short_interests_table_path)
     last_dates = None
     if table_exists:
@@ -69,18 +67,15 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
         last_dates = short_sdf.groupBy('Symbol').agg(F.max('Date').alias('last_date')).collect()
         last_dates = rowlist2dict(last_dates)
         
-    logger.warn('3')
     total_rows = 0
     for i, symbol in enumerate(symbols):
         data = []
         if table_exists:
             # Get the last date of a stock. If this last date >= YESTERDAY_DATE, don't do anything.
             if last_dates != None:
-                logger.warn('4')
-                date = last_dates[symbol]
-                if date != None:
-                    logger.warn('5')
-                    logger.warn("last date for {} is {}".format(symbol, date))
+                if symbol in last_dates:
+                    date = last_dates[symbol]
+                    # logger.warn("last date for {} is {}".format(symbol, date))
                     if a_before_b(date, YESTERDAY_DATE):
                         logger.warn('6')
                         logger.warn("last date is > yesterday date, so we pull data from {} to {}".format(date, YESTERDAY_DATE))
@@ -95,9 +90,7 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
                 short_sdf = spark.createDataFrame(data)
 
         total_rows += len(data)
-        logger.warn('7')
         if (i%log_every_n == 0 or (i+1) == len(symbols)):
-            logger.warn('8')
             logger.warn("downloading from exchange {} - {}/{} - total rows in this batch: {}".format(exchange, i+1, len(symbols), total_rows))
         
         if len(data) > 0:
