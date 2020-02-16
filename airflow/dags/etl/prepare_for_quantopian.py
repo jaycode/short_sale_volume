@@ -6,7 +6,9 @@ sdf = spark.read.csv(DB_HOST+TABLE_SHORT_ANALYSIS, header=True)
 
 # Correct all Quantopian errors here.
 # -----------
-sdf.withColumn('symbol', F.when(F.col('symbol')=='GECCL', 'GECC_L').otherwise(F.col('symbol')))
+sdf = sdf.withColumn('symbol', F.when(F.col('symbol')=='GECCL', 'GECC_L').otherwise(F.col('symbol')))
+logger.warn(sdf.where(F.col('symbol') == 'GECCL').collect())
+logger.warn(sdf.where(F.col('symbol') == 'GECC_L').collect())
 # -----------
 
 sdf.select(['date', 'symbol', 'short_exempt_volume', 'short_volume', 'total_volume']) \

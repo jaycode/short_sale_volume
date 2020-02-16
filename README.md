@@ -75,9 +75,13 @@ $ cat $AIRFLOW_HOME/airflow-webserver.pid | sudo xargs kill -9
 
 ## FAQs
 
+### Can I keep the EMR cluster after use?
+
+By default, Cluster DAG turns off EMR cluster after use or if there is an error in the Short Interests DAG. If you want to keep it on, create a Variable named `keep_emr_cluster` from the `Admin > Variables` menu at the top. This is useful for debugging, as it saves time rather than recreating the cluster all the time. Don't forget to delete the variable to avoid unneeded server costs.
+
 ### Where can I see the progress of the pulling process?
 
-Click on the DAG's name, then on either Graph View or Tree View, click on the currently running task, then click on "View Log". You will need to keep refreshing and view the bottom of the page to check on the progress. **The status is updated every 10 minutes.**
+Click on the DAG's name, then on either Graph View or Tree View, click on the currently running task, then click on "View Log". You will need to keep refreshing and view the bottom of the page to check on the progress. **The status is updated every 5 minutes.**
 
 Here is an example of outputs from the log for short interests:
 
@@ -105,7 +109,9 @@ As a reference, with 3-10 EMR cluster's slave nodes, it takes between 20 to 40 m
 If there is an error on any of the steps in the Short Interests DAG, the system will do the following:
 
 1. The DAG will stop running. Set the state of this worker DAG into ERROR.
-2. The Cluster DAG will detect the state, then proceeds with turning off the EMR cluster (this is to avoid exorbitant charges from leaving it running).
+2. The Cluster DAG will detect the state, then either:
+  - By default, proceeds with turning off the EMR cluster (this is to avoid exorbitant charges from leaving it running).
+  - If a Variable `keep_emr_cluster` exists, keep the EMR cluster.
 
 Therefore, the final state is a SUCCESS state for the Cluster DAG and the ERROR state for the Short Interests DAG. To re-run only the step that contains the erorr, perform the following procedure:
 
