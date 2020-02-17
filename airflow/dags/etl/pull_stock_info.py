@@ -8,6 +8,11 @@ def pull_stock_info(url, db_host, table_path):
         delete_path(spark, db_host, table_path)
         df = spark.createDataFrame([[content]], ['info_csv'])
 
+        # Some tickers, like "BRK.A", should be changed to "BRK_S" instead.
+        # replace_dots = F.udf(lambda x: x.replace('.', '_'), T.StringType())
+        # df = df.withColumn('Symbol', F.when(F.col('Symbol').contains('.'), replace_dots('Symbol')).otherwise(F.col('Symbol')))
+        df = df.withColumn('Symbol', F.regexp_replace('Symbol', '\.', '_'))
+
         # Sometimes there is a race condition that caused FileAlreadyExistsException error.
         # In that case, do not do anything.
         try:
