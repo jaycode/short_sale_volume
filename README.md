@@ -32,7 +32,7 @@ The pipeline is to be run once a day at 00:00. On the first run, it gets all dat
 ## How to set up and run
 
 1. Create a key pair in the AWS EC2 console.
-2. Create a CloudFormation stack from the `basic_network.yml` template. This is a generic VPC configuration with 2 private and 2 public subnets which should be quite useful for other similar projects too. I recommend setting the stack name with something generic, like "BasicNetwork". Take note of the first VPC ID and SubnetID of the first public subnet.
+2. Create a CloudFormation stack from the `basic_network.yml` template. This is a generic VPC configuration with 2 private and 2 public subnets which should be quite useful for other similar projects too. I recommend setting the stack name with something generic, like "BasicNetwork". Take note of the first VPC ID and SubnetID of the first public subnet. **Todo: Find a way to combine this into the main CloudFormation stack in the next point and to remove unneeded subnets.**
 3. Create a CloudFormation stack from `aws-cf_template.yml`. Pass in your Quandl key and AWS Access ID and Private Access Key. I would name this stack with a specific project's name like "ShortInterests".
 4. After the stack created, go to the "Outputs" tab to get the URL of the Airflow admin, something like `http://ec2-3-219-234-248.compute-1.amazonaws.com:8080`. You can get the endpoint from there, which you can use to SSH connect.
     ```
@@ -41,30 +41,13 @@ The pipeline is to be run once a day at 00:00. On the first run, it gets all dat
     ```
 
 5. Connect via ssh to the server. Note that the Airflow admin may likely not be ready just yet, because there may be some code that is still running on the EC2 server. To check on the progress, SSH-connect to the EC2 instance, then run this command `cat /var/log/user-data.log` to see the entire log, or `tail /var/log/user-data.log` to view the last few lines.
-6. Once the Airflow webserver is ready (check the file `/var/log/user-data.log` a few times until there are no changes), run the following commands on the server to run Airflow Scheduler:
 
-    ```
-    airflow scheduler -D
-    ```
-
-    If you got the following error:
-
-    ```
-    Warning: You have two airflow.cfg files: /home/ec2-user/airflow/airflow.cfg and /home/ec2-user/short_interest_effect/airflow/airflow.cfg. Airflow used to look at ~/airflow/airflow.cfg, even when AIRFLOW_HOME was set to a different value. Airflow will now only read /home/ec2-user/short_interest_effect/airflow/airflow.cfg, and you should remove the other file
-    ```
-
-    Run this code:
-    ```
-    rm -r airflow 
-    ```
-
-    Before running the scheduler.
-
+## How to kill the scheduler and webserver
 
 To kill Airflow scheduler:
 
 ```
-$ kill $(ps -ef | grep "airflow scheduler" | awk '{print $2}')
+$ sudo kill $(ps -ef | grep "airflow scheduler" | awk '{print $2}')
 ```
 
 To kill Airflow webserver:
@@ -177,3 +160,5 @@ The answer to this comes in two flavors:
 3. The `local-only` branch is for the local version of Airflow. This was needed when the system was initially developed. I don't see how it is ever going to be needed again, but I keep this branch just in case someone may need it.
 4. Both the `aws-latest` and `local-only` branches are currently not fast enough for use with large datasets. Diff the `airflow/etl/short_interests.py` with `quantopian-only` branch and move the needed updates to the other branches. Also, do similar updates to the `airflow/etl/pull_prices.py` file.
 5. Investigate whether parallelization of the GET requests would improve the ETL speed (see the "FAQs" section above).
+6. The `UserData` code in `aws-cf_template.yml` was made by trial-and-error. There are some redundant code like the AWS configure code and how Airflow scheduler cannot be created from the `ec2-user` (and therefore we can only shut it down with `sudo`). If you are a bash code expert, this code will certainly benefit from your expertise.
+7. The CloudFormation stack currently has 2 public and 2 private subnets, while the scheduler only resides on a single public subnet. It took a lot of experiments to get to this working point so I did not improve this. If you are a CloudFormation expert, your assistance here would be totally appreciated.
