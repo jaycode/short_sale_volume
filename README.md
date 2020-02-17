@@ -95,6 +95,10 @@ You may resize through the EMR cluster page, then click on Hardware. However, cu
 
 The scheduler is smart enough not to re-process the data, so there is no worry here.
 
+### Can I stop the EC2 server and re-run at later time?
+
+Unfortunately, no. To stop the server, you currently need to delete the CloudFormation stack and re-upload the template for future re-runs. On the bright side, though, the system is designed to pick up from your previous state of the database, so it is okay to recreate the whole stack multiple times. **Todo: How do we update the code so EC2 server can be stopped and continued?**
+
 ### How do I debug the Short Interests DAG?
 
 If there is an error on any of the steps in the Short Interests DAG, the system will do the following:
@@ -144,12 +148,6 @@ Then click on the "Clear" button:
 
 Now we just need to wait for the Short Interests Dag to complete running.
 
-
-## Troubleshooting
-
-> botocore.exceptions.ClientError: An error occurred (ValidationException) when calling the RunJobFlow operation: Invalid InstanceProfile: EMR_EC2_DefaultRole.
-
-It's likely `EMR_EC2_DefaultRole` instance profile is not ready yet when we create the cluster. Clear the `create_cluster_task` from `cluster_dag` and wait for it being re-run.
 
 ## Other Scenarios
 
