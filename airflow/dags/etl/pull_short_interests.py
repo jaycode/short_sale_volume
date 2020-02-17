@@ -93,8 +93,7 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
             logger.warn("downloading from exchange {} - {}/{} - total rows in this batch: {}".format(exchange, i+1, len(symbols), total_rows))
         
         if len(data) > 0:
-            # short_sdf.write.mode('append').format('csv').save(host+short_interests_table_path, header=True)
-            pass
+            short_sdf.write.mode('append').format('csv').save(host+short_interests_table_path, header=True)
     logger.warn("done!")
 
 pull_short_interests('FNSQ', DB_HOST, TABLE_STOCK_INFO_NASDAQ, TABLE_SHORT_INTERESTS_NASDAQ)
