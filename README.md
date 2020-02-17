@@ -8,7 +8,7 @@ It has been commonly understood that a sizeable short interest may cause a stock
 
 The data pipeline is built on Apache Airflow, with Apache Spark + Hadoop plugin to pull the data and store them in a data lake on an S3 server (with Parquet format).
 
-At the time of writing (2020-01-15), we have 3582 stocks from NASDAQ and 3092 stocks from NYSE. The earliest date is 2013-04-01, which accounts for nearly 1700 data points (261 working days each year). That means, we have more than 10 millions of data to process at max. At max, because many of the stocks won't have all of the days' data. Some of them may no longer exist. A complete run on 2020-02-05 returned approximately 6,798,996 rows of data (counted with `rdd.countApprox` function - see `4.vaildate_completed_data.ipynb` for the code).
+At the time of writing (2020-01-15), we have 3582 stocks from NASDAQ and 3092 stocks from NYSE. The earliest date is 2013-04-01, which accounts for nearly 1700 data points (261 working days each year). That means, we have more than 10 millions of data to process at max. At max, because many of the stocks won't have all of the days' data. Some of them may no longer exist. A complete run on 2020-02-05 returned approximately 6,798,996 rows of data (counted with `rdd.countApprox` function - see `4.validate_completed_data.ipynb` for the code).
 
 To demonstrate that the pipeline works, we only use a small subset of the data, consisting of only 7 stocks configured in `airflow/config.cfg` file.
 
@@ -57,6 +57,12 @@ $ cat $AIRFLOW_HOME/airflow-webserver.pid | sudo xargs kill -9
 ```
 
 ## FAQs
+
+### How long does it take for a single run to download all short interest data?
+
+Daily update should take about 40-50 minutes, with 20+ minutes only for gathering the short interest data.
+
+If you are starting from a completely new database, I'm not quite sure how long it is going to take, since the project had undergone major changes from its initial version. Initially, it took about 20 minutes every 110,000 - 120,000 data points, so about a whooping 17 hours for the whole database. It is probably down to only a few hours now. **Todo: Update this section once we have the information.**
 
 ### Can I keep the EMR cluster after use?
 
@@ -155,10 +161,11 @@ The answer to this comes in two flavors:
 
 ## Todos
 
-1. There are a couple of **Todo**s above. If you feel generous, post a pull request to improve them.
-2. The `aws-latest` branch is meant to gather pricing data from QuoteMedia then combine them with the short interest data from Quandl. However, the branch still currently has some bugs, and it does not make sense to combine the data for later slicing them off when preparing the data for use in Quantopian. When the need to analyze the data outside of Quantopian arises, work on this branch further.
-3. The `local-only` branch is for the local version of Airflow. This was needed when the system was initially developed. I don't see how it is ever going to be needed again, but I keep this branch just in case someone may need it.
-4. Both the `aws-latest` and `local-only` branches are currently not fast enough for use with large datasets. Diff the `airflow/etl/short_interests.py` with `quantopian-only` branch and move the needed updates to the other branches. Also, do similar updates to the `airflow/etl/pull_prices.py` file.
-5. Investigate whether parallelization of the GET requests would improve the ETL speed (see the "FAQs" section above).
-6. The `UserData` code in `aws-cf_template.yml` was made by trial-and-error. There are some redundant code like the AWS configure code and how Airflow scheduler cannot be created from the `ec2-user` (and therefore we can only shut it down with `sudo`). If you are a bash code expert, this code will certainly benefit from your expertise.
-7. The CloudFormation stack currently has 2 public and 2 private subnets, while the scheduler only resides on a single public subnet. It took a lot of experiments to get to this working point so I did not improve this. If you are a CloudFormation expert, your assistance here would be totally appreciated.
+1. Run the code to build an empty database, and update the **FAQ** to include this information.
+2. There are a couple of **Todo**s above. If you feel generous, post a pull request to improve them.
+3. The `aws-latest` branch is meant to gather pricing data from QuoteMedia then combine them with the short interest data from Quandl. However, the branch still currently has some bugs, and it does not make sense to combine the data for later slicing them off when preparing the data for use in Quantopian. When the need to analyze the data outside of Quantopian arises, work on this branch further.
+4. The `local-only` branch is for the local version of Airflow. This was needed when the system was initially developed. I don't see how it is ever going to be needed again, but I keep this branch just in case someone may need it.
+5. Both the `aws-latest` and `local-only` branches are currently not fast enough for use with large datasets. Diff the `airflow/etl/short_interests.py` with `quantopian-only` branch and move the needed updates to the other branches. Also, do similar updates to the `airflow/etl/pull_prices.py` file.
+6. Investigate whether parallelization of the GET requests would improve the ETL speed (see the "FAQs" section above).
+7. The `UserData` code in `aws-cf_template.yml` was made by trial-and-error. There are some redundant code like the AWS configure code and how Airflow scheduler cannot be created from the `ec2-user` (and therefore we can only shut it down with `sudo`). If you are a bash code expert, this code will certainly benefit from your expertise.
+8. The CloudFormation stack currently has 2 public and 2 private subnets, while the scheduler only resides on a single public subnet. It took a lot of experiments to get to this working point so I did not improve this. If you are a CloudFormation expert, your assistance here would be totally appreciated.
