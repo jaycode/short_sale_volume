@@ -8,7 +8,7 @@ It has been commonly understood that a sizeable short interest may cause a stock
 
 The data pipeline is built on Apache Airflow, with Apache Spark + Hadoop plugin to pull the data and store them in a data lake on an S3 server (with Parquet format).
 
-At the time of writing (2020-01-15), we have 3582 stocks from NASDAQ and 3092 stocks from NYSE. The earliest date is 2013-04-01, which accounts for nearly 1700 data points (261 working days each year). That means, we have more than 10 millions of data to process at max. At max, because many of the stocks won't have all of the days' data. Some of them may no longer exist. A complete run on 2020-02-05 returned approximately 6,798,996 rows of data (counted with `rdd.countApprox` function - see `4.vaildate_completed_data.ipynb` for the code).
+At the time of writing (2020-01-15), we have 3582 stocks from NASDAQ and 3092 stocks from NYSE. The earliest date is 2013-04-01, which accounts for nearly 1700 data points (261 working days each year). That means, we have more than 10 millions of data to process at max. At max, because many of the stocks won't have all of the days' data. Some of them may no longer exist. A complete run on 2020-02-05 returned approximately 6,798,996 rows of data (counted with `rdd.countApprox` function - see `4.validate_completed_data.ipynb` for the code).
 
 To demonstrate that the pipeline works, we only use a small subset of the data, consisting of only 7 stocks configured in `airflow/config.cfg` file.
 
@@ -32,7 +32,7 @@ The pipeline is to be run once a day at 00:00. On the first run, it gets all dat
 ## How to set up and run
 
 1. Create a key pair in the AWS EC2 console.
-2. Create a CloudFormation stack from the `basic_network.yml` template. This is a generic VPC configuration with 2 private and 2 public subnets which should be quite useful for other similar projects too. I recommend setting the stack name with something generic, like "BasicNetwork". Take note of the first VPC ID and SubnetID of the first public subnet.
+2. Create a CloudFormation stack from the `basic_network.yml` template. This is a generic VPC configuration with 2 private and 2 public subnets which should be quite useful for other similar projects too. I recommend setting the stack name with something generic, like "BasicNetwork". Take note of the first VPC ID and SubnetID of the first public subnet. **Todo: Find a way to combine this into the main CloudFormation stack in the next point and to remove unneeded subnets.**
 3. Create a CloudFormation stack from `aws-cf_template.yml`. Pass in your Quandl key and AWS Access ID and Private Access Key. I would name this stack with a specific project's name like "ShortInterests".
 4. After the stack created, go to the "Outputs" tab to get the URL of the Airflow admin, something like `http://ec2-3-219-234-248.compute-1.amazonaws.com:8080`. You can get the endpoint from there, which you can use to SSH connect.
     ```
@@ -41,30 +41,13 @@ The pipeline is to be run once a day at 00:00. On the first run, it gets all dat
     ```
 
 5. Connect via ssh to the server. Note that the Airflow admin may likely not be ready just yet, because there may be some code that is still running on the EC2 server. To check on the progress, SSH-connect to the EC2 instance, then run this command `cat /var/log/user-data.log` to see the entire log, or `tail /var/log/user-data.log` to view the last few lines.
-6. Once the Airflow webserver is ready (check the file `/var/log/user-data.log` a few times until there are no changes), run the following commands on the server to run Airflow Scheduler:
 
-    ```
-    airflow scheduler -D
-    ```
-
-    If you got the following error:
-
-    ```
-    Warning: You have two airflow.cfg files: /home/ec2-user/airflow/airflow.cfg and /home/ec2-user/short_interest_effect/airflow/airflow.cfg. Airflow used to look at ~/airflow/airflow.cfg, even when AIRFLOW_HOME was set to a different value. Airflow will now only read /home/ec2-user/short_interest_effect/airflow/airflow.cfg, and you should remove the other file
-    ```
-
-    Run this code:
-    ```
-    rm -r airflow 
-    ```
-
-    Before running the scheduler.
-
+## How to kill the scheduler and webserver
 
 To kill Airflow scheduler:
 
 ```
-$ kill $(ps -ef | grep "airflow scheduler" | awk '{print $2}')
+$ sudo kill $(ps -ef | grep "airflow scheduler" | awk '{print $2}')
 ```
 
 To kill Airflow webserver:
@@ -74,6 +57,12 @@ $ cat $AIRFLOW_HOME/airflow-webserver.pid | sudo xargs kill -9
 ```
 
 ## FAQs
+
+### How long does it take for a single run to download all short interest data?
+
+Daily update should take about 40-50 minutes, with 20+ minutes only for gathering the short interest data.
+
+If you are starting from a completely new database, I'm not quite sure how long it is going to take, since the project had undergone major changes from its initial version. Initially, it took about 20 minutes every 110,000 - 120,000 data points, so about a whooping 17 hours for the whole database. It is probably down to only a few hours now. **Todo: Update this section once we have the information.**
 
 ### Can I keep the EMR cluster after use?
 
@@ -172,8 +161,11 @@ The answer to this comes in two flavors:
 
 ## Todos
 
-1. There are a couple of **Todo**s above. If you feel generous, post a pull request to improve them.
-2. The `aws-latest` branch is meant to gather pricing data from QuoteMedia then combine them with the short interest data from Quandl. However, the branch still currently has some bugs, and it does not make sense to combine the data for later slicing them off when preparing the data for use in Quantopian. When the need to analyze the data outside of Quantopian arises, work on this branch further.
-3. The `local-only` branch is for the local version of Airflow. This was needed when the system was initially developed. I don't see how it is ever going to be needed again, but I keep this branch just in case someone may need it.
-4. Both the `aws-latest` and `local-only` branches are currently not fast enough for use with large datasets. Diff the `airflow/etl/short_interests.py` with `quantopian-only` branch and move the needed updates to the other branches. Also, do similar updates to the `airflow/etl/pull_prices.py` file.
-5. Investigate whether parallelization of the GET requests would improve the ETL speed (see the "FAQs" section above).
+1. Run the code to build an empty database, and update the **FAQ** to include this information.
+2. There are a couple of **Todo**s above. If you feel generous, post a pull request to improve them.
+3. The `aws-latest` branch is meant to gather pricing data from QuoteMedia then combine them with the short interest data from Quandl. However, the branch still currently has some bugs, and it does not make sense to combine the data for later slicing them off when preparing the data for use in Quantopian. When the need to analyze the data outside of Quantopian arises, work on this branch further.
+4. The `local-only` branch is for the local version of Airflow. This was needed when the system was initially developed. I don't see how it is ever going to be needed again, but I keep this branch just in case someone may need it.
+5. Both the `aws-latest` and `local-only` branches are currently not fast enough for use with large datasets. Diff the `airflow/etl/short_interests.py` with `quantopian-only` branch and move the needed updates to the other branches. Also, do similar updates to the `airflow/etl/pull_prices.py` file.
+6. Investigate whether parallelization of the GET requests would improve the ETL speed (see the "FAQs" section above).
+7. The `UserData` code in `aws-cf_template.yml` was made by trial-and-error. There are some redundant code like the AWS configure code and how Airflow scheduler cannot be created from the `ec2-user` (and therefore we can only shut it down with `sudo`). If you are a bash code expert, this code will certainly benefit from your expertise.
+8. The CloudFormation stack currently has 2 public and 2 private subnets, while the scheduler only resides on a single public subnet. It took a lot of experiments to get to this working point so I did not improve this. If you are a CloudFormation expert, your assistance here would be totally appreciated.
