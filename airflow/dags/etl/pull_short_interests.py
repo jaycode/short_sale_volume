@@ -77,10 +77,15 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
                 if symbol in last_dates:
                     date = last_dates[symbol]
                     if a_before_b(date, YESTERDAY_DATE):
-                        logger.warn("{}: last date is > yesterday date, so we pull data from {} to {}".format(symbol, date, YESTERDAY_DATE))
+                        logger.warn("{}: last date ({}) is > yesterday date ({}), so we pull the data".format(symbol, date, YESTERDAY_DATE))
                         data = pull_exchange_short_interests_by_symbol(symbol, date, YESTERDAY_DATE)
+                    else:
+                        logger.warn("{}: last date ({}) is <= yesterday date ({}), so do nothing".format(symbol, date, YESTERDAY_DATE))
+                else:
+                    logger.warn("{}: pull data from all dates".format(symbol))
+                    data = pull_exchange_short_interests_by_symbol(symbol, START_DATE, YESTERDAY_DATE)
             else:
-                logger.warn("pull data from all dates")
+                logger.warn("{}: pull data from all dates".format(symbol))
                 data = pull_exchange_short_interests_by_symbol(symbol, START_DATE, YESTERDAY_DATE)
         else:
             data = pull_exchange_short_interests_by_symbol(symbol, START_DATE, YESTERDAY_DATE)
