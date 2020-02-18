@@ -8,14 +8,18 @@ def pull_stock_info(url, db_host, table_path):
         delete_path(spark, db_host, table_path)
         df = spark.createDataFrame([[content]], ['info_csv'])
 
-        # Sometimes there is a race condition that caused FileAlreadyExistsException error.
-        # In that case, do not do anything.
-        try:
-            df.rdd.map(lambda x: x['info_csv'].replace("[","").replace("]", "")).saveAsTextFile(db_host+table_path)
-            logger.warn("Stored data from {} to {}.".format(url, db_host+table_path))
-        except Py4JJavaError as e:
-            logger.warn("Table {} already exists.".format(db_host+table_path))
-            pass
+        df.rdd.map(lambda x: x['info_csv'].replace("[","").replace("]", "")).saveAsTextFile(db_host+table_path+'-temp')
+        logger.warn("Stored data from {} to {}.".format(url, db_host+table_path+'-temp'))
+
+        # Some tickers, like "BRK.A", should be changed to "BRK_S" instead.
+        df = spark.read.csv(db_host+table_path+'-temp', header=True)
+        # replace_dots = F.udf(lambda x: x.replace('.', '_'), T.StringType())
+        # df = df.withColumn('Symbol', F.when(F.col('Symbol').contains('.'), replace_dots('Symbol')).otherwise(F.col('Symbol')))
+        df = df.withColumn('Symbol', F.regexp_replace('Symbol', '\.', '_')) \
+             .write.mode('overwrite').format('csv').save(db_host+table_path, header=True)
+             
+        delete_path(spark, db_host, table_path+'-temp')
+
     else:
         logger.warn("Failed to connect to {}. We will use existing stock info data if they have been created.".format(url))
         
