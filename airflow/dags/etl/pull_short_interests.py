@@ -69,6 +69,7 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
         last_dates = rowlist2dict(last_dates)
         
     total_rows = 0
+    data_to_write = []
     for i, symbol in enumerate(symbols):
         data = []
         if table_exists:
@@ -77,8 +78,11 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
                 if symbol in last_dates:
                     date = last_dates[symbol]
                     if a_before_b(date, YESTERDAY_DATE):
-                        logger.warn("{}: last date ({}) is > yesterday date ({}), so we pull the data".format(symbol, date, YESTERDAY_DATE))
                         data = pull_exchange_short_interests_by_symbol(symbol, date, YESTERDAY_DATE)
+                        if len(data)==0:
+                            logger.warn("{}: last date ({}) is > yesterday date ({}) and data exist Keep the data for storing".format(symbol, date, YESTERDAY_DATE))
+                        else:
+                            logger.warn("{}: last date ({}) is > yesterday date ({}) but no data is available in Quandl".format(symbol, date, YESTERDAY_DATE))
                     else:
                         logger.warn("{}: last date ({}) is <= yesterday date ({}), so do nothing".format(symbol, date, YESTERDAY_DATE))
                 else:
@@ -91,12 +95,16 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
             data = pull_exchange_short_interests_by_symbol(symbol, START_DATE, YESTERDAY_DATE)
         
         if len(data) > 0:
-            sdf_to_write = spark.createDataFrame(data)
-            sdf_to_write.write.mode('append').format('csv').save(host+short_interests_table_path, header=True)
+            data_to_write += data
 
         total_rows += len(data)
         if (i%log_every_n == 0 or (i+1) == len(symbols)):
             logger.warn("downloading from exchange {} - {}/{} - total rows in this batch: {}".format(exchange, i+1, len(symbols), total_rows))
+            if len(data_to_write) > 0:
+                sdf_to_write = spark.createDataFrame(data_to_write)
+                sdf_to_write.write.mode('append').format('csv').save(host+short_interests_table_path, header=True)
+                logger.warn("Written {} rows to {}".format(len(data_to_write), host+short_interests_table_path))
+                data_to_write = []
 
 
     logger.warn("done!")

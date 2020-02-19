@@ -24,7 +24,7 @@ The pipeline consists of the following tasks:
 3. Short Interest DAG, we will refer to this, and other non-cluster DAGs in the future, as **worker DAGs**: 
   - Pull short interest data from [Quandl's Financial Industry Regulatory Authority's short interest data](https://www.quandl.com/data/FINRA-Financial-Industry-Regulatory-Authority).
   - Store the data in the S3 server (or locally, depending on the setting in `config.cfg`).
-  - Combine data from FINRA/NYSE and FINRA/NASDAQ exchanges (**Todo: There is also ORF exchange, but not sure where to get the list of stocks. Can anybody help?**)
+  - Combine data from FINRA/NYSE and FINRA/NASDAQ exchanges (**Todo: There is also ORF and ADF exchanges, but I'm not sure where to get the list of stocks from. Can anybody help?**)
 
 The pipeline is to be run once a day at 00:00. On the first run, it gets all data up to yesterday's date. On the following dates, we get one day of data for each day.
 
@@ -60,7 +60,7 @@ $ cat $AIRFLOW_HOME/airflow-webserver.pid | sudo xargs kill -9
 
 ### How long does it take for a single run to download all short interest data?
 
-Daily update should take about 40-50 minutes, with 20+ minutes only for gathering the short interest data.
+Daily update should take about 40-50 minutes, with 20+ minutes for the gathering process of the short interest data.
 
 If you are starting from a completely new database, I'm not quite sure how long it is going to take, since the project had undergone major changes from its initial version. Initially, it took about 20 minutes every 110,000 - 120,000 data points, so about a whooping 17 hours for the whole database. It is probably down to only a few hours now. **Todo: Update this section once we have the information.**
 
@@ -82,7 +82,7 @@ You may resize through the EMR cluster page, then click on Hardware. However, cu
 
 ### What happens when the process got stopped in the middle?
 
-The scheduler is smart enough not to re-process the data, so there is no worry here.
+The scheduler is smart enough not to re-process the data, so there is no worry here. However, the data are stored every after 100 requests, so some requests will need to be redone (should be okay however).
 
 ### Can I stop the EC2 server and re-run at later time?
 
@@ -161,11 +161,12 @@ The answer to this comes in two flavors:
 
 ## Todos
 
-1. Run the code to build an empty database, and update the **FAQ** to include this information.
-2. There are a couple of **Todo**s above. If you feel generous, post a pull request to improve them.
-3. The `aws-latest` branch is meant to gather pricing data from QuoteMedia then combine them with the short interest data from Quandl. However, the branch still currently has some bugs, and it does not make sense to combine the data for later slicing them off when preparing the data for use in Quantopian. When the need to analyze the data outside of Quantopian arises, work on this branch further.
-4. The `local-only` branch is for the local version of Airflow. This was needed when the system was initially developed. I don't see how it is ever going to be needed again, but I keep this branch just in case someone may need it.
-5. Both the `aws-latest` and `local-only` branches are currently not fast enough for use with large datasets. Diff the `airflow/etl/short_interests.py` with `quantopian-only` branch and move the needed updates to the other branches. Also, do similar updates to the `airflow/etl/pull_prices.py` file.
-6. Investigate whether parallelization of the GET requests would improve the ETL speed (see the "FAQs" section above).
-7. The `UserData` code in `aws-cf_template.yml` was made by trial-and-error. There are some redundant code like the AWS configure code and how Airflow scheduler cannot be created from the `ec2-user` (and therefore we can only shut it down with `sudo`). If you are a bash code expert, this code will certainly benefit from your expertise.
-8. The CloudFormation stack currently has 2 public and 2 private subnets, while the scheduler only resides on a single public subnet. It took a lot of experiments to get to this working point so I did not improve this. If you are a CloudFormation expert, your assistance here would be totally appreciated.
+1. A more comprehensive list of stock tickers is needed. Currently, the list of stock tickers are gathered from the Nasdaq's site, but it does not include stocks of closed or acquired companies. ARRY, for example, does not exist when the code was run on 2020-02-19, while Quantopian has this ticker.
+2. Run the code to build an empty database, and update the **FAQ** to include this information.
+3. There are a couple of **Todo**s above. If you feel generous, post a pull request to improve them.
+4. The `aws-latest` branch is meant to gather pricing data from QuoteMedia then combine them with the short interest data from Quandl. However, the branch still currently has some bugs, and it does not make sense to combine the data for later slicing them off when preparing the data for use in Quantopian. When the need to analyze the data outside of Quantopian arises, work on this branch further.
+5. The `local-only` branch is for the local version of Airflow. This was needed when the system was initially developed. I don't see how it is ever going to be needed again, but I keep this branch just in case someone may need it.
+6. Both the `aws-latest` and `local-only` branches are currently not fast enough for use with large datasets. Diff the `airflow/etl/short_interests.py` with `quantopian-only` branch and move the needed updates to the other branches. Also, do similar updates to the `airflow/etl/pull_prices.py` file.
+7. Investigate whether parallelization of the GET requests would improve the ETL speed (see the "FAQs" section above).
+8. The `UserData` code in `aws-cf_template.yml` was made by trial-and-error. There are some redundant code like the AWS configure code and how Airflow scheduler cannot be created from the `ec2-user` (and therefore we can only shut it down with `sudo`). If you are a bash code expert, this code will certainly benefit from your expertise.
+9. The CloudFormation stack currently has 2 public and 2 private subnets, while the scheduler only resides on a single public subnet. It took a lot of experiments to get to this working point so I did not improve this. If you are a CloudFormation expert, your assistance here would be totally appreciated.
