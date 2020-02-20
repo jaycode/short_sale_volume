@@ -12,6 +12,26 @@ At the time of writing (2020-01-15), we have 3582 stocks from NASDAQ and 3092 st
 
 To demonstrate that the pipeline works, we only use a small subset of the data, consisting of only 7 stocks configured in `airflow/config.cfg` file.
 
+## Analysis Example
+
+This is an example of an analysis we may perform with this dataset.
+
+- The analysis was performed on the Quantopian Notebook environment.
+- The data came from 2013-04-02 to 2020-02-10 (Y-m-d). I took the daily, 5 days, 22 days, and 65 days of returns (all of them are working days, and thus, in other words, they are daily, weekly, monthly, and 3-month returns) and took the short interest ratio at that date, that is short interest volume divided by total volume.
+- From all the data above, I took 1000 sample data from each Morningstar sector. From there, I took the rows between 25% and 75% quantiles for each returns set (as such, there are 6000 data points in total)
+
+![analysis](media/analysis.png)
+
+As we have seen from the above visualizations, up until 1-month returns, short interests had some positive correlation with stock returns in the Technology sector. We also see interestingly an adverse correlation in the Healthcare stocks' returns.
+
+For the 3-month returns, the highest positive effect was in the Industrials sector.
+
+In other words, for stocks in the Healthcare industry, for instance, the visualization suggests that the higher the number of short interests a stock has, the lower its return in the next month, but not so much in the next 3 months.
+
+This information might be useful for deciding whether to use short interest data to decide on which industry's stocks to go long and short with.
+
+For future work, it might be interesting to see how the correlation changes in different periods. In addition to sector-based grouping, you may add time-based grouping e.g. according to business or political cycles.
+
 ## Steps
 
 The pipeline consists of the following tasks:
@@ -60,7 +80,7 @@ $ cat $AIRFLOW_HOME/airflow-webserver.pid | sudo xargs kill -9
 
 ### How long does it take for a single run to download all short interest data?
 
-Daily update should take about 40-50 minutes, with 20+ minutes for the gathering process of the short interest data.
+Daily update should take about 1+ hour, with 35+ minutes for the gathering process of the short interest data.
 
 If you are starting from a completely new database, I'm not quite sure how long it is going to take, since the project had undergone major changes from its initial version. Initially, it took about 20 minutes every 110,000 - 120,000 data points, so about a whooping 17 hours for the whole database. It is probably down to only a few hours now. **Todo: Update this section once we have the information.**
 
