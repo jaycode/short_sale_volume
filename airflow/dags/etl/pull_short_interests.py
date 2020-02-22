@@ -73,33 +73,33 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
     for i, symbol in enumerate(symbols):
         data = []
         if table_exists:
-            # Get the last date of a stock. If this last date >= YESTERDAY_DATE, don't do anything.
+            # Get the last date of a stock. If this last date >= PULL_DATE, don't do anything.
             if last_dates != None:
                 if symbol in last_dates:
                     date = last_dates[symbol]
-                    if a_before_b(date, YESTERDAY_DATE):
-                        data = pull_exchange_short_interests_by_symbol(symbol, date, YESTERDAY_DATE)
+                    if a_before_b(date, PULL_DATE):
+                        data = pull_exchange_short_interests_by_symbol(symbol, date, PULL_DATE)
                         if len(data)==0:
-                            logger.warn("{}: last date ({}) is > yesterday date ({}) and data exist Keep the data for storing".format(symbol, date, YESTERDAY_DATE))
+                            logger.warn("{}: last date ({}) is > pull date ({}) and data exist Keep the data for storing".format(symbol, date, PULL_DATE))
                         else:
-                            logger.warn("{}: last date ({}) is > yesterday date ({}) but no data is available in Quandl".format(symbol, date, YESTERDAY_DATE))
+                            logger.warn("{}: last date ({}) is > pull date ({}) but no data is available in Quandl".format(symbol, date, PULL_DATE))
                     else:
-                        logger.warn("{}: last date ({}) is <= yesterday date ({}), so do nothing".format(symbol, date, YESTERDAY_DATE))
+                        logger.warn("{}: last date ({}) is <= pull date ({}), so do nothing".format(symbol, date, PULL_DATE))
                 else:
                     logger.warn("{}: pull data from all dates".format(symbol))
-                    data = pull_exchange_short_interests_by_symbol(symbol, START_DATE, YESTERDAY_DATE)
+                    data = pull_exchange_short_interests_by_symbol(symbol, START_DATE, PULL_DATE)
             else:
                 logger.warn("{}: pull data from all dates".format(symbol))
-                data = pull_exchange_short_interests_by_symbol(symbol, START_DATE, YESTERDAY_DATE)
+                data = pull_exchange_short_interests_by_symbol(symbol, START_DATE, PULL_DATE)
         else:
-            data = pull_exchange_short_interests_by_symbol(symbol, START_DATE, YESTERDAY_DATE)
+            data = pull_exchange_short_interests_by_symbol(symbol, START_DATE, PULL_DATE)
         
         if len(data) > 0:
             data_to_write += data
 
         total_rows += len(data)
         if (i%log_every_n == 0 or (i+1) == len(symbols)):
-            logger.warn("downloading from exchange {} - {}/{} - total rows in this batch: {}".format(exchange, i+1, len(symbols), total_rows))
+            logger.warn("storing data downloaded from exchange {} - {}/{} - total rows in this batch: {}".format(exchange, i+1, len(symbols), total_rows))
             if len(data_to_write) > 0:
                 sdf_to_write = spark.createDataFrame(data_to_write)
                 sdf_to_write.write.mode('append').format('csv').save(host+short_interests_table_path, header=True)

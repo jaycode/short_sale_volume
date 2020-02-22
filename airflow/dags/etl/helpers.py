@@ -1,4 +1,6 @@
 from py4j.protocol import Py4JJavaError
+from pyspark.sql.utils import AnalysisException
+
 
 sc = spark.sparkContext
 sc._jsc.hadoopConfiguration().set("fs.s3a.access.key", AWS_ACCESS_KEY_ID)
@@ -77,13 +79,19 @@ def spark_table_exists(host, table_path):
 
     try:
         status = fs.listStatus(Path(table_path))
+        spark.read.csv(host+table_path, header=True)
 
         return True
     except Py4JJavaError as e:
         if 'FileNotFoundException' in str(e):
             return False
         else:
-            print(e)
+            raise
+    except AnalysisException as e:
+        if 'Unable to infer schema' in str(e):
+            return False
+        else:
+            raise
 
 
 def check_basic_quality(logger, host, table_path, table_type='csv'):
