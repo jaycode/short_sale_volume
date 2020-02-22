@@ -232,7 +232,8 @@ combine_quality_check_task = PythonOperator(
             'TABLE_SHORT_INTERESTS_NASDAQ': config['App']['TABLE_SHORT_INTERESTS_NASDAQ'],
             'TABLE_SHORT_INTERESTS_NYSE': config['App']['TABLE_SHORT_INTERESTS_NYSE'],
             'TABLE_SHORT_ANALYSIS': config['App']['TABLE_SHORT_ANALYSIS_QUANTOPIAN'],
-        }
+        },
+        'on_complete': on_complete
     },
     dag=dag
 )
