@@ -80,11 +80,11 @@ def pull_short_interests(exchange, host, info_table_path, short_interests_table_
                     if a_before_b(date, PULL_DATE):
                         data = pull_exchange_short_interests_by_symbol(symbol, date, PULL_DATE)
                         if len(data)==0:
-                            logger.warn("{}: last date ({}) is > pull date ({}) and data exist Keep the data for storing".format(symbol, date, PULL_DATE))
+                            logger.warn("{}: last date in db ({}) is before pull date ({}) and data exist. Hold the data in memory for storing to db.".format(symbol, date, PULL_DATE))
                         else:
-                            logger.warn("{}: last date ({}) is > pull date ({}) but no data is available in Quandl".format(symbol, date, PULL_DATE))
+                            logger.warn("{}: last date in db ({}) is before pull date ({}) but no data newer than last date is available in Quandl.".format(symbol, date, PULL_DATE))
                     else:
-                        logger.warn("{}: last date ({}) is <= pull date ({}), so do nothing".format(symbol, date, PULL_DATE))
+                        logger.warn("{}: last date in db ({}) is after pull date ({}), so do nothing.".format(symbol, date, PULL_DATE))
                 else:
                     logger.warn("{}: pull data from all dates".format(symbol))
                     data = pull_exchange_short_interests_by_symbol(symbol, START_DATE, PULL_DATE)
