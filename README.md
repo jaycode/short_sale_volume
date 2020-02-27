@@ -1,6 +1,6 @@
-# Effect of Short Interest to Stock Pricing - for Quantopian Self-Serve Data
+# Effect of Short Sale Volume to Stock Pricing - for Quantopian Self-Serve Data
 
-Download short interests from Quandl, then process it to be uploaded to Quantopian Self-Serve Data.
+Download FINRA short sale volume from Quandl, then process it to be uploaded to Quantopian Self-Serve Data.
 
 ## Overview
 

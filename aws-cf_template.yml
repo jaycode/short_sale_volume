@@ -8,7 +8,7 @@ Parameters:
     Type: AWS::EC2::KeyPair::KeyName
     ConstraintDescription: Must be the name of an existing EC2 KeyPair
   OutputDBHost:
-    Description: REQUIRED - Can be a local path or S3 bucket path (With format "s3a://<bucket-name>" DO NOT END with "/"). This path will be used to read and write the short interest dataset.
+    Description: REQUIRED - Can be a local path or S3 bucket path (With format "s3a://<bucket-name>" DO NOT END with "/"). This path will be used to read and write the short sale volume dataset.
     Type: String
     AllowedPattern: '.+'
   QuandlAPIKey:
@@ -68,7 +68,7 @@ Parameters:
   BranchToPull:
     Type: String
     Default: quantopian-only
-    Description: Branch from https://github.com/jaycode/short_interest_effect to pull
+    Description: Branch from https://github.com/jaycode/short_sale_volume to pull
 # Mapping to find the Amazon Linux AMI in each region.
 Mappings:
   RegionMap:
@@ -145,9 +145,9 @@ Resources:
          sudo yum install -y git
          # Download pipeline code
          cd /home/ec2-user
-         git clone -b ${BranchToPull} https://github.com/jaycode/short_interest_effect.git
-         cd /home/ec2-user/short_interest_effect
-         sudo chmod -R 777 /home/ec2-user/short_interest_effect
+         git clone -b ${BranchToPull} https://github.com/jaycode/short_sale_volume.git
+         cd /home/ec2-user/short_sale_volume
+         sudo chmod -R 777 /home/ec2-user/short_sale_volume
          # Install boto3
          sudo python3 -m pip install boto3
          # Install airflow using pip
@@ -161,48 +161,48 @@ Resources:
          sudo python3 -m pip install markupsafe
          sudo python3 -m pip install --upgrade MarkupSafe
          echo 'export PATH=/usr/local/bin:$PATH' >> /root/.bashrc
-         echo 'export AIRFLOW_HOME=/home/ec2-user/short_interest_effect/airflow' >> /root/.bashrc
+         echo 'export AIRFLOW_HOME=/home/ec2-user/short_sale_volume/airflow' >> /root/.bashrc
          source /root/.bashrc
          #
          echo 'export PATH=/usr/local/bin:$PATH' >> /home/ec2-user/.bashrc
-         echo 'export AIRFLOW_HOME=/home/ec2-user/short_interest_effect/airflow' >> /home/ec2-user/.bashrc
+         echo 'export AIRFLOW_HOME=/home/ec2-user/short_sale_volume/airflow' >> /home/ec2-user/.bashrc
          #
          # Update configuration files
-         cp /home/ec2-user/short_interest_effect/airflow/config.cfg.default /home/ec2-user/short_interest_effect/airflow/config.cfg
+         cp /home/ec2-user/short_sale_volume/airflow/config.cfg.default /home/ec2-user/short_sale_volume/airflow/config.cfg
          # Use | as delimiter instead of / because OutputDBHost may have forward slashes
-         sed -i -e '/DB_HOST=/ s|=.*|=${OutputDBHost}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/API_KEY=/ s|=.*|=${QuandlAPIKey}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/AWS_ACCESS_KEY_ID=/ s|=.*|=${AWSAccessKeyID}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/AWS_SECRET_ACCESS_KEY=/ s|=.*|=${AWSSecretAccessKey}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/REGION_NAME=/ s|=.*|=${AWS::Region}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/STOCK_LIMITS=/ s|=.*|=${StockLimits}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/STOCKS=/ s|=.*|=${Stocks}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/EMR_NUM_CORE_NODES=/ s|=.*|=${EMRNumCoreNodes}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/EMR_CORE_NODE_INSTANCE_TYPE=/ s|=.*|=${EMRCoreNodeInstanceType}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/VPC_ID=/ s|=.*|=${VPCId}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
-         sed -i -e '/SUBNET_ID=/ s|=.*|=${SubnetId}|' /home/ec2-user/short_interest_effect/airflow/config.cfg
+         sed -i -e '/DB_HOST=/ s|=.*|=${OutputDBHost}|' /home/ec2-user/short_sale_volume/airflow/config.cfg
+         sed -i -e '/API_KEY=/ s|=.*|=${QuandlAPIKey}|' /home/ec2-user/short_sale_volume/airflow/config.cfg
+         sed -i -e '/AWS_ACCESS_KEY_ID=/ s|=.*|=${AWSAccessKeyID}|' /home/ec2-user/short_sale_volume/airflow/config.cfg
+         sed -i -e '/AWS_SECRET_ACCESS_KEY=/ s|=.*|=${AWSSecretAccessKey}|' /home/ec2-user/short_sale_volume/airflow/config.cfg
+         sed -i -e '/REGION_NAME=/ s|=.*|=${AWS::Region}|' /home/ec2-user/short_sale_volume/airflow/config.cfg
+         sed -i -e '/STOCK_LIMITS=/ s|=.*|=${StockLimits}|' /home/ec2-user/short_sale_volume/airflow/config.cfg
+         sed -i -e '/STOCKS=/ s|=.*|=${Stocks}|' /home/ec2-user/short_sale_volume/airflow/config.cfg
+         sed -i -e '/EMR_NUM_CORE_NODES=/ s|=.*|=${EMRNumCoreNodes}|' /home/ec2-user/short_sale_volume/airflow/config.cfg
+         sed -i -e '/EMR_CORE_NODE_INSTANCE_TYPE=/ s|=.*|=${EMRCoreNodeInstanceType}|' /home/ec2-user/short_sale_volume/airflow/config.cfg
+         sed -i -e '/VPC_ID=/ s|=.*|=${VPCId}|' /home/ec2-user/short_sale_volume/airflow/config.cfg
+         sed -i -e '/SUBNET_ID=/ s|=.*|=${SubnetId}|' /home/ec2-user/short_sale_volume/airflow/config.cfg
          #
          # Initialize Airflow
          airflow initdb
          #
          # Update the database connection in the Airflow Config file
-         sed -i '/sql_alchemy_conn/s/^/#/g' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
-         sed -i '/sql_alchemy_conn/ a sql_alchemy_conn = postgresql://airflow:${AirflowDBPassword}@127.0.0.1:5432/airflowdb' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         sed -i '/sql_alchemy_conn/s/^/#/g' /home/ec2-user/short_sale_volume/airflow/airflow.cfg
+         sed -i '/sql_alchemy_conn/ a sql_alchemy_conn = postgresql://airflow:${AirflowDBPassword}@127.0.0.1:5432/airflowdb' /home/ec2-user/short_sale_volume/airflow/airflow.cfg
          # Update the type of executor in the Airflow Config file
-         sed -i '/executor = SequentialExecutor/s/^/#/g' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
-         sed -i '/executor = SequentialExecutor/ a executor = LocalExecutor' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         sed -i '/executor = SequentialExecutor/s/^/#/g' /home/ec2-user/short_sale_volume/airflow/airflow.cfg
+         sed -i '/executor = SequentialExecutor/ a executor = LocalExecutor' /home/ec2-user/short_sale_volume/airflow/airflow.cfg
          # Hide examples
-         sed -i '/load_examples = True/s/^/#/g' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
-         sed -i '/load_examples = True/ a load_examples = False' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         sed -i '/load_examples = True/s/^/#/g' /home/ec2-user/short_sale_volume/airflow/airflow.cfg
+         sed -i '/load_examples = True/ a load_examples = False' /home/ec2-user/short_sale_volume/airflow/airflow.cfg
          # Setup webserver log
          mkdir -p /home/ec2-user/log
          touch /home/ec2-user/log/access.log
          chmod 777 /home/ec2-user/log
          chmod 777 /home/ec2-user/log/access.log
-         sed -i -e '/access_logfile/ s/=.*/=\/home\/ec2-user\/log\/access\.log/' /home/ec2-user/short_interest_effect/airflow/airflow.cfg
+         sed -i -e '/access_logfile/ s/=.*/=\/home\/ec2-user\/log\/access\.log/' /home/ec2-user/short_sale_volume/airflow/airflow.cfg
          #
          airflow initdb
-         chmod -R 777 /home/ec2-user/short_interest_effect
+         chmod -R 777 /home/ec2-user/short_sale_volume
          # Run Airflow webserver
          airflow webserver -D
          sudo -u ec2-user -s source /home/ec-user/.bashrc

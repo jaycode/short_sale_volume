@@ -63,7 +63,7 @@ default_args = {
 
 dag = DAG('short_interests_dag',
           default_args=default_args,
-          description="Pull short interest data from Quandl",
+          description="Pull short sale volume data from Quandl",
           schedule_interval='@daily',
           max_active_runs=1
 )
